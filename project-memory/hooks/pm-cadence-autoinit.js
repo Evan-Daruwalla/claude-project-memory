@@ -20,8 +20,8 @@
  *   - .claude/pm-cadence.json already exists
  *   - the project's own .claude/settings.json already registers a
  *     UserPromptSubmit hook (assume it runs its own cadence mechanism —
- *     this is how Trading's check_docs_cadence.py avoids a double-fire,
- *     without hardcoding Trading by name)
+ *     this lets a project with a pre-existing cadence hook avoid a
+ *     double-fire, without hardcoding any project by name)
  *
  * Output: structured JSON on stdout per the PreToolUse hook contract, adding
  * additionalContext when (and only when) a config was just auto-created.
