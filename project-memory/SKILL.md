@@ -35,6 +35,36 @@ Explicitly OUTSIDE this system: project-specific operational artifacts (daily
 reports, run logs, generated dashboards) that have their own rules — never
 fold them in.
 
+## 0. FIRST-LOAD CADENCE SETUP (before any workflow, once per project)
+
+Cadence firing is made DETERMINISTIC by a `UserPromptSubmit` hook
+(`hooks/pm-cadence.js`): it counts prompts per project and injects a reminder
+every Nth. The hook only counts + reminds — obeying the reminder is still the
+model's job; a hook cannot invoke this skill. A project already running its own
+cadence hook should NOT get a `pm-cadence.json` (the shared hook stays dormant
+without one, so there's no double-firing).
+
+On EVERY invocation, first check for `.claude/pm-cadence.json` in the project:
+
+- **Present** → cadence already configured; go straight to the requested workflow.
+- **Absent** → first load. Set cadence up before anything else:
+  1. Ask, in ONE question, how often each subpart should fire (offer defaults;
+     a number = "remind every N prompts", 0 = off / event-driven):
+     - Record entry (§2) — default **3**
+     - Handoff (§3) — default **0** (session-end / manual)
+     - PRD next-task (§4) — default **0** (on request)
+     - Codebase-memory bins (§5) — default **0** (on fact-change)
+  2. Write `.claude/pm-cadence.json` with their numbers:
+     `{"record_entry":3,"handoff":0,"prd_next_task":0,"bins":0,"_count":0,"_last_reminder_iso":null}`
+  3. Ensure the hook is registered. A global registration in
+     `~/.claude/settings.json` (UserPromptSubmit → `node "…/project-memory/hooks/pm-cadence.js"`)
+     covers every project and is dormant until the project has a
+     `pm-cadence.json`, so wire it once. If it isn't present, add the block
+     from the hook file's header and tell the user it takes effect on the next
+     session start.
+  4. Confirm what was written; note subparts set to 0 are event-driven, not
+     prompt-counted.
+
 ## 1. BOOTSTRAP (new project, or "set up the memory system")
 
 1. **Inventory what exists.** HANDOFF.md, docs/, CLAUDE.md, git history. Never

@@ -42,6 +42,36 @@ Copy the `project-memory/` directory into your Claude Code skills folder:
 Then invoke it with `/project-memory`, or let it trigger on phrases like
 "handoff", "log this", "bootstrap the docs", or "run the next PRD task".
 
+## Deterministic cadence hook
+
+The cadence (e.g. "append a record entry every 3 prompts") is enforced by a
+`UserPromptSubmit` hook — `project-memory/hooks/pm-cadence.js` (Node, no
+dependencies). On the skill's first load in a project it asks how often each of
+the four subparts should fire, writes the answers to `.claude/pm-cadence.json`,
+and ensures the hook is registered. The hook then counts prompts per project
+and injects a reminder every Nth.
+
+What's deterministic: the counting and the reminder injection — they fire
+regardless of context length or which model is driving. What's not: a hook
+cannot *invoke* a skill, so acting on the reminder is still the model's job. It
+replaces a CLAUDE.md cadence line the model forgets deep in a session with a
+fresh top-of-turn instruction.
+
+Register it once, globally, so it covers every project and stays dormant until
+a project has a `pm-cadence.json`:
+
+```json
+"hooks": {
+  "UserPromptSubmit": [
+    { "hooks": [ { "type": "command",
+      "command": "node \"<abs path>/project-memory/hooks/pm-cadence.js\"",
+      "timeout": 5000 } ] }
+  ]
+}
+```
+
+Requires `node` on PATH.
+
 ## Principles it enforces
 
 - Absolute dates only — never "today" or "recently".
@@ -54,3 +84,4 @@ Then invoke it with `/project-memory`, or let it trigger on phrases like
 
 - `project-memory/SKILL.md` — the skill definition and the five workflows.
 - `project-memory/templates.md` — copy-ready skeletons for each artifact.
+- `project-memory/hooks/pm-cadence.js` — the deterministic cadence hook.
