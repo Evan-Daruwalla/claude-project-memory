@@ -37,33 +37,38 @@ fold them in.
 
 ## 0. FIRST-LOAD CADENCE SETUP (before any workflow, once per project)
 
-Cadence firing is made DETERMINISTIC by a `UserPromptSubmit` hook
-(`hooks/pm-cadence.js`): it counts prompts per project and injects a reminder
-every Nth. The hook only counts + reminds — obeying the reminder is still the
-model's job; a hook cannot invoke this skill. A project already running its own
-cadence hook should NOT get a `pm-cadence.json` (the shared hook stays dormant
-without one, so there's no double-firing).
+Cadence firing is made DETERMINISTIC by two hooks, not by the model
+remembering to check:
 
-On EVERY invocation, first check for `.claude/pm-cadence.json` in the project:
+- **`hooks/pm-cadence-autoinit.js`** (`PreToolUse`, matcher `Skill`) fires on
+  EVERY skill invocation project-wide; it no-ops unless `tool_input.skill ===
+  "project-memory"`. The first time this skill is invoked in a project, if
+  `.claude/pm-cadence.json` doesn't exist yet AND the project has no
+  `UserPromptSubmit` hook of its own already (that second check is how a
+  project already running its own cadence mechanism avoids getting a second
+  one — no hardcoding, just "does this project already have a cadence hook"),
+  it auto-creates the config with defaults and injects a context note.
+- **`hooks/pm-cadence.js`** (`UserPromptSubmit`) then counts prompts per
+  project against that config and injects a reminder every Nth subpart-cadence.
 
-- **Present** → cadence already configured; go straight to the requested workflow.
-- **Absent** → first load. Set cadence up before anything else:
-  1. Ask, in ONE question, how often each subpart should fire (offer defaults;
-     a number = "remind every N prompts", 0 = off / event-driven):
-     - Record entry (§2) — default **3**
-     - Handoff (§3) — default **0** (session-end / manual)
-     - PRD next-task (§4) — default **0** (on request)
-     - Codebase-memory bins (§5) — default **0** (on fact-change)
-  2. Write `.claude/pm-cadence.json` with their numbers:
-     `{"record_entry":3,"handoff":0,"prd_next_task":0,"bins":0,"_count":0,"_last_reminder_iso":null}`
-  3. Ensure the hook is registered. A global registration in
-     `~/.claude/settings.json` (UserPromptSubmit → `node "…/project-memory/hooks/pm-cadence.js"`)
-     covers every project and is dormant until the project has a
-     `pm-cadence.json`, so wire it once. If it isn't present, add the block
-     from the hook file's header and tell the user it takes effect on the next
-     session start.
-  4. Confirm what was written; note subparts set to 0 are event-driven, not
-     prompt-counted.
+Neither hook can invoke this skill or ask the user anything — that's the real
+ceiling (no hook can run interactively). What they DO make deterministic:
+config creation and the counting/reminder, regardless of whether the model
+ever reads this section. The model's only remaining job:
+
+- **If the injected context says a config was just auto-created** (tagged
+  `_auto_created: true` in the file, or you see the `[PM-CADENCE] ... auto-
+  created defaults` note): ask, in ONE question, whether the user wants
+  different numbers than the defaults (record_entry 3; handoff/prd_next_task/
+  bins 0 = event-driven), then update `.claude/pm-cadence.json` if they do and
+  drop the `_auto_created` flag.
+- **Otherwise**: config already exists (auto-created earlier or hand-set) —
+  don't re-ask, just proceed with the requested workflow.
+- **If somehow no config exists and no auto-init note appeared** (e.g. the
+  global hook isn't registered on this machine): fall back to asking directly
+  and writing the file yourself, and tell the user to add the PreToolUse block
+  from `pm-cadence-autoinit.js`'s header to `~/.claude/settings.json` so this
+  doesn't recur.
 
 ## 1. BOOTSTRAP (new project, or "set up the memory system")
 
