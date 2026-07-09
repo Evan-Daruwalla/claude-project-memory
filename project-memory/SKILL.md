@@ -3,15 +3,16 @@ name: project-memory
 description: >
   A project memory + execution-doc system for Claude Code, built around four durable artifacts:
   HANDOFF.md (the single live snapshot) + an append-only chronological record + a standing
-  PRD_ROADMAP.md + per-project codebase-memory bins. One skill, five workflows: BOOTSTRAP the
+  PRD_ROADMAP.md + per-project codebase-memory bins. One skill, six workflows: BOOTSTRAP the
   system in a new project; append a RECORD ENTRY mid-session; end-of-session HANDOFF sync; write
-  a PRD or EXECUTE its next open task; maintain CODEBASE-MEMORY bins. Use when the user says
-  "/project-memory", "handoff", "update the docs", "update the record/HANDOFF", "append the
-  record", "log this", "record this", "bootstrap the memory/doc system", "set up the docs",
-  "next task", "run the next PRD task", "continue the plan/roadmap", "check the bins", "update
-  the bins" — or when wrapping up a work session, starting a project that lacks HANDOFF.md, or
-  given no direction in a project that has a PRD_ROADMAP.md. Exact file skeletons live in
-  templates.md (read it before creating any doc).
+  a PRD or EXECUTE its next open task; maintain CODEBASE-MEMORY bins; DRIFT-CHECK the HANDOFF's
+  claims against reality. Use when the user says "/project-memory", "handoff", "update the docs",
+  "update the record/HANDOFF", "append the record", "log this", "record this", "bootstrap the
+  memory/doc system", "set up the docs", "next task", "run the next PRD task", "continue the
+  plan/roadmap", "check the bins", "update the bins", "drift check", "verify the docs", "is
+  HANDOFF still true" — or when wrapping up a work session, starting a project that lacks
+  HANDOFF.md, or given no direction in a project that has a PRD_ROADMAP.md. Exact file skeletons
+  live in templates.md (read it before creating any doc).
 ---
 
 # project-memory — the doc/memory system
@@ -204,6 +205,34 @@ re-reading the codebase — and without loading everything.
   INDEX to the user for correction before treating it as truth.
 - **Precedence**: CLAUDE.md/HANDOFF override bin contents on conflict. Bins
   govern memory mechanics, never how the owner wants code written.
+
+## 6. DRIFT-CHECK ("verify the docs", "drift check", "is HANDOFF still true?")
+
+The verification arm of the system: HANDOFF.md is the only live snapshot, and a
+cheap model's worst failure mode is confidently acting on a stale one. This
+workflow re-tests what HANDOFF CLAIMS against reality and reports the drift.
+Scope is strictly HANDOFF.md's claims — not the skill docs, not a code audit.
+
+1. **Extract claims.** Read HANDOFF.md and list every INDEPENDENTLY VERIFIABLE
+   claim: test suites and their pinned results, services/ports said to be
+   running, scheduled tasks said to exist, files/DBs said to exist (with sizes),
+   workstream statuses ("Done" ⇒ the commit exists), dates ("Last updated").
+2. **Classify each claim:**
+   - CHEAP — verifiable now with a read-only or fast command → run it.
+   - EXPENSIVE/RISKY — needs a long run, a protected time window, or touches
+     live state → do NOT run; report as UNVERIFIED-TODAY with the exact command
+     a future session should use, and why it was skipped.
+3. **Run the cheap checks for real.** Paste real output. Respect the project's
+   hard rules while checking (read-only access to shared state; protected time
+   windows; never run anything with side effects on production).
+4. **Report a drift table:** claim → observed reality → verdict per row:
+   **MATCH** / **DRIFT** (with the delta) / **UNVERIFIED-TODAY** (with reason).
+   Outcome-first: lead with "no drift" or the count of drifted rows.
+5. **On DRIFT:** the report is the deliverable — fix HANDOFF only with the
+   owner's go-ahead (or when the fix is unambiguous, e.g. a stale date), and
+   any fix routes through §3 (record entry + HANDOFF update), never a silent
+   edit. For historical disagreements the record wins; HANDOFF is what gets
+   corrected.
 
 ## Rules (all workflows)
 

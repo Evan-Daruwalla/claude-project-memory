@@ -19,7 +19,7 @@ The design goal: a session started cold — by any model, including a cheaper
 one — can read `HANDOFF.md`, pick up the plan, and execute without the owner
 filling gaps from memory.
 
-## Five workflows
+## Six workflows
 
 - **Bootstrap** — stand the system up in a new project, seeded from real git
   history (nothing invented).
@@ -30,6 +30,8 @@ filling gaps from memory.
   project's own definition of done.
 - **Codebase-memory bins** — maintain per-project technical memory that a
   session reads selectively to save tokens.
+- **Drift-check** — re-test what HANDOFF claims (tests, services, statuses)
+  against reality and report MATCH / DRIFT / UNVERIFIED-TODAY per claim.
 
 ## Install
 
