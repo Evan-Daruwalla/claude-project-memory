@@ -47,9 +47,21 @@ fold them in.
    real sources entries are grounded in), "How this document is organized",
    TOC. Seed from git history and existing docs — real events with absolute
    dates only, NOTHING invented; an empty section beats a plausible fabrication.
-4. **Wire the cadence into `CLAUDE.md`**: update the record every ~3 prompts
-   of real work; if the cadence slips, catch up next prompt and note the miss
-   in the record.
+4. **Wire the cadence into `CLAUDE.md`** — ASK, don't assume. This skill has
+   four independently-firing subparts; ask the user how often each should run
+   and write the answers into the project `CLAUDE.md` (default in parens if
+   they say "whatever"):
+   - **Record entry** (§2) — every N prompts of real work (default: 3).
+   - **Handoff** (§3) — at session end, or every N prompts (default: session
+     end only).
+   - **PRD next-task** (§4) — on request, or as the default idle action
+     (default: on request).
+   - **Codebase-memory bins** (§5) — same session as any code change that
+     alters a stored fact (default: on fact-change only; not prompt-timed).
+   These are SOFT instructions the model self-enforces, not hooks — if a count
+   slips, catch up next prompt and note the miss in the record. If the user
+   wants a hard guarantee, that's a `settings.json` hook, out of this skill's
+   scope.
 5. **Memory files**: if the harness has a persistent memory store, record the
    doc layout + hard constraints there and index them.
 6. **Verify**: re-read HANDOFF.md as a fresh session would — does it alone say
