@@ -182,6 +182,13 @@ Conventions: dated decisions ("decided <date>") · BLOCKED on anything needing
 the owner's accounts/keys/purchases · per-task done-checks · tasks sized so a
 cheaper model finishes one without the owner.
 
+Mutability (never wholesale-delete/retype the roadmap): ADD by appending ·
+REMOVE by striking through in place with a dated reason (`~~task~~ (dropped
+<date>: why)`), never deleting · PIVOT by FORKING — keep the old tree marked
+`SUPERSEDED by the <date> fork`, add `## CURRENT DIRECTION (forked <date>)`,
+exactly one fork current at a time. Status ticks update in place; planned work
+is only struck, never erased.
+
 ## §4 codebase-memory bins
 
 `INDEX.md` (≤25 lines):

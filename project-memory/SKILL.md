@@ -29,7 +29,7 @@ use `# Appendix <X>` headings; never reformat an existing doc to the template.
 |---|---|---|
 | `HANDOFF.md` | The only live snapshot; a fresh session reads it FIRST | Rewritten freely; keep it a snapshot, move history to the record |
 | `docs/<record>.md` (a chronological build log, e.g. `Project Record — Full Chronological History.md` or `record_<date>.md`) | Append-only chronological build log — the ground truth; when anything disagrees with it, the record wins. Point-in-time snapshots live INSIDE it as dated entries | APPEND-ONLY; front-matter TOC gets one new line per entry; prior entries never edited |
-| `PRD_ROADMAP.md` | Standing plan a model executes task-by-task | Updated only on the owner's scope decisions, each stamped with its date |
+| `PRD_ROADMAP.md` | Standing plan a model executes task-by-task | Grows by APPEND; never wholesale-deleted/retyped. Removed steps are struck through in place (kept + dated); a new direction is a dated FORK marked as the current plan (see §4) |
 | `.claude/codebase-memory/` | Binned technical memory (see §5) | Superseded in place, same session as the code change |
 
 Explicitly OUTSIDE this system: project-specific operational artifacts (daily
@@ -147,6 +147,25 @@ Tasks must be small enough for a cheaper model to finish alone, each naming
 its files and its done-check. Scope decisions get dated ("decided
 YYYY-MM-DD"). Anything needing the owner's accounts/keys/purchases is marked
 BLOCKED (needs the owner), never silently assumed.
+
+**PRD mutability — the roadmap keeps its own planning history; NEVER
+wholesale-delete or retype it.** The plan's evolution is itself part of the
+record:
+- **Add** by APPENDING new tasks/milestones. Don't rewrite the whole plan to
+  slot something in.
+- **Remove** a step by STRIKING IT THROUGH in place with a dated reason —
+  `~~M3.2 — do X~~ (dropped 2026-07-10: superseded by Y)` — never by deleting
+  the line. A later reader must still see what was planned and abandoned, and why.
+- **Pivot** (the plan takes a genuinely new direction) by FORKING, not
+  replacing: keep the old milestone tree, mark it `SUPERSEDED by the <date>
+  fork`, and add the new direction under a clearly-labelled
+  `## CURRENT DIRECTION (forked <date>): <why>` heading. Exactly ONE fork is
+  the current plan at a time — mark it unambiguously so the executing model
+  works the right one.
+- Every add / strike / fork is dated. The PRD is append-mostly (not strictly
+  append-only like the record): reading aids — SUCCESS CRITERIA checkboxes,
+  milestone status — tick in place, but planned WORK is only struck, never
+  erased.
 
 **Executing the next task** (default action in a project with a PRD):
 1. Load context in order: project `CLAUDE.md` → `HANDOFF.md` →
