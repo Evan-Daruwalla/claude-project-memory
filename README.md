@@ -2,7 +2,12 @@
 
 A [Claude Code](https://claude.com/claude-code) skill for keeping a project's
 memory correct across sessions and models. It packages one durable
-documentation system into five on-demand workflows.
+documentation system into six on-demand workflows.
+
+> This is the memory / documentation half of a two-repo generalized skill set.
+> The non-memory skills — security gates, model-quality tooling, and review /
+> advisory skills — live in the sibling repo
+> **[claude-skill-suite](https://github.com/Evan-Daruwalla/claude-skill-suite)**.
 
 ## The system
 
@@ -97,7 +102,7 @@ Requires `node` on PATH.
 
 ## Files
 
-- `project-memory/SKILL.md` — the skill definition and the five workflows.
+- `project-memory/SKILL.md` — the skill definition and the six workflows.
 - `project-memory/templates.md` — copy-ready skeletons for each artifact.
 - `project-memory/hooks/pm-cadence.js` — counts prompts, injects the reminder.
 - `project-memory/hooks/pm-cadence-autoinit.js` — auto-creates the config on
