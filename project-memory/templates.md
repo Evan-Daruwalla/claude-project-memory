@@ -196,6 +196,7 @@ is only struck, never erased.
 ```markdown
 # codebase-memory index — <project>
 
+Core bins:
 - security.md — <one-line scope> (updated <YYYY-MM-DD>)
 - performance.md — <scope> (updated <YYYY-MM-DD>)
 - architecture.md — <scope> (updated <YYYY-MM-DD>)
@@ -203,9 +204,20 @@ is only struck, never erased.
 - conventions.md — <scope> (updated <YYYY-MM-DD>)
 - gotchas.md — <scope> (updated <YYYY-MM-DD>)
 
+Standards bins (only those the codebase actually commits to):
+- dependencies.md — libraries/frameworks + pinned versions + why (updated <YYYY-MM-DD>)
+- ui.md — design language / component / styling / motion / a11y (updated <YYYY-MM-DD>)
+- testing.md — framework, test layout, coverage/frozen rules (updated <YYYY-MM-DD>)
+- data.md — schema/migration + API/interface contracts (updated <YYYY-MM-DD>)
+- tooling.md — build/lint/format/CI + required commands (updated <YYYY-MM-DD>)
+
 Cross-bin invariants:
 - <only ones short enough to always load>
 ```
+
+Standards bins are opt-in: create one only when the project actually holds that
+standard (no frontend → no `ui.md`; no DB → no `data.md`). Same entry rules as
+the core bins.
 
 Bin entries: one fact per line/short block · absolute dates · supersede in
 place ("(supersedes <date> entry: X)") · "(inferred, unverified)" where not

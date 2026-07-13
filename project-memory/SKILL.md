@@ -200,9 +200,17 @@ re-reading the codebase — and without loading everything.
   offer to bootstrap a fresh one, never reuse another project's.
 - **Structure**: `INDEX.md` (≤25 lines: one line per bin — name, scope,
   last-updated — plus cross-bin invariants short enough to always load) + one
-  file per bin: `security.md`, `performance.md`, `architecture.md`,
-  `features.md`, `conventions.md`, `gotchas.md`. Add a bin only when recurring
-  facts don't fit; never speculatively.
+  file per bin. **Core bins**: `security.md`, `performance.md`,
+  `architecture.md`, `features.md`, `conventions.md`, `gotchas.md`.
+  **Standards bins** — one per standard the codebase actually commits to, so a
+  future session honors the same choices instead of guessing:
+  `dependencies.md` (libraries/frameworks + pinned versions + why each + what
+  NOT to add), `ui.md` (design language, component/styling/motion/a11y
+  standards — frontend only), `testing.md` (framework, test layout, what must
+  be covered, frozen-test rules), `data.md` (schema/migration conventions,
+  API/interface contracts), `tooling.md` (build/lint/format/CI + required
+  commands). Create a bin only when the project actually holds that standard
+  and the facts recur; never speculatively (no frontend → no `ui.md`).
 - **What goes in**: only facts expensive to rediscover or dangerous to forget —
   invariants, protocols, decisions with reasons, measured results, constraints.
   NOT what grep answers instantly, NOT session narrative (that's the record's
