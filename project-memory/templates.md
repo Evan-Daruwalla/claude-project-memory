@@ -215,9 +215,11 @@ Cross-bin invariants:
 - <only ones short enough to always load>
 ```
 
-Standards bins are opt-in: create one only when the project actually holds that
-standard (no frontend → no `ui.md`; no DB → no `data.md`). Same entry rules as
-the core bins.
+Bootstrap the FULL set (core + standards), not opt-in. A standard this project
+doesn't hold gets a one-line dated N/A stub, never omitted — e.g.
+`ui.md — N/A, no frontend (2026-07-15)` — so every standard has one home and
+facts never scatter. Replace the stub with real facts the moment they exist.
+Same entry rules as the core bins.
 
 Bin entries: one fact per line/short block · absolute dates · supersede in
 place ("(supersedes <date> entry: X)") · "(inferred, unverified)" where not

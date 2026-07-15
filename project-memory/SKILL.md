@@ -209,8 +209,14 @@ re-reading the codebase — and without loading everything.
   standards — frontend only), `testing.md` (framework, test layout, what must
   be covered, frozen-test rules), `data.md` (schema/migration conventions,
   API/interface contracts), `tooling.md` (build/lint/format/CI + required
-  commands). Create a bin only when the project actually holds that standard
-  and the facts recur; never speculatively (no frontend → no `ui.md`).
+  commands). **Bootstrap creates the FULL set (core + standards), not opt-in**:
+  a bin with no facts yet — or a standard this project doesn't hold — gets a
+  ONE-LINE dated stub (`ui.md — N/A, no frontend (2026-…)`; `performance.md —
+  empty, no perf work yet (2026-…)`), NEVER omitted. Why: every standard gets
+  one obvious home, so facts stop scattering into other bins, and the stub
+  records that the standard was considered. Replace the stub with real facts
+  the moment they exist. (Preference: an empty bin beats a fact scattered
+  across three other bins.)
 - **What goes in**: only facts expensive to rediscover or dangerous to forget —
   invariants, protocols, decisions with reasons, measured results, constraints.
   NOT what grep answers instantly, NOT session narrative (that's the record's
