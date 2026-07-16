@@ -142,6 +142,13 @@ ever reads this section. The model's only remaining job:
 
 ## 4. PRD — write one, or execute its next task
 
+**Before drafting — grill the open decisions.** If the plan has interdependent
+or unresolved design choices, interview the user ONE question at a time, each
+with your recommended answer, walking down the decision tree until every branch
+is resolved. Where a question is already answered by the codebase, resolve it
+from the code instead of asking. Only draft once the tree is settled — a PRD
+written over unresolved forks bakes in guesses a cheaper model can't unwind later.
+
 **Writing/updating a PRD**: use templates.md §3 (the 7 numbered sections).
 Tasks must be small enough for a cheaper model to finish alone, each naming
 its files and its done-check. Scope decisions get dated ("decided
