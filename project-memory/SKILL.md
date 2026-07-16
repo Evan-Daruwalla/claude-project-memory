@@ -205,8 +205,10 @@ re-reading the codebase — and without loading everything.
   **Standards bins** — one per standard the codebase actually commits to, so a
   future session honors the same choices instead of guessing:
   `dependencies.md` (libraries/frameworks + pinned versions + why each + what
-  NOT to add), `ui.md` (design language, component/styling/motion/a11y
-  standards — frontend only), `testing.md` (framework, test layout, what must
+  NOT to add), `ui.md` (**UI + UX design** — visual/design language,
+  component/styling/motion/a11y standards, AND UX: user flows, interaction
+  patterns, information architecture, empty/error/loading states — frontend
+  only), `testing.md` (framework, test layout, what must
   be covered, frozen-test rules), `data.md` (schema/migration conventions,
   API/interface contracts), `tooling.md` (build/lint/format/CI + required
   commands). **Bootstrap creates the FULL set (core + standards), not opt-in**:

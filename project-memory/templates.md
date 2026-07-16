@@ -206,7 +206,7 @@ Core bins:
 
 Standards bins (only those the codebase actually commits to):
 - dependencies.md — libraries/frameworks + pinned versions + why (updated <YYYY-MM-DD>)
-- ui.md — design language / component / styling / motion / a11y (updated <YYYY-MM-DD>)
+- ui.md — UI + UX: design language / component / styling / motion / a11y + UX flows / IA / states (updated <YYYY-MM-DD>)
 - testing.md — framework, test layout, coverage/frozen rules (updated <YYYY-MM-DD>)
 - data.md — schema/migration + API/interface contracts (updated <YYYY-MM-DD>)
 - tooling.md — build/lint/format/CI + required commands (updated <YYYY-MM-DD>)
