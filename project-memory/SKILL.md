@@ -76,6 +76,11 @@ ever reads this section. The model's only remaining job:
 1. **Inventory what exists.** HANDOFF.md, docs/, CLAUDE.md, git history. Never
    overwrite an existing doc — extend it; converge partial systems to this
    shape rather than duplicating files.
+   **Project-type profiles:** if the project ships a public website/app, or is
+   research-class (experiments/studies), ALSO read `profiles/website.md` /
+   `profiles/research.md` — the extra records that project type must retain
+   beyond the standard doc set; fold the applicable rows into the HANDOFF,
+   bins, and docs plan. Inapplicable rows are already stubbed N/A there.
 2. **Create `HANDOFF.md`** from templates.md §1: Goal (why the project exists,
    in the owner's terms), dated Current state, key architecture/data facts,
    hard constraints, Documentation section, next actions.
