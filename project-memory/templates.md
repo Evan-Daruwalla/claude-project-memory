@@ -218,7 +218,7 @@ Cross-bin invariants:
 Bootstrap the FULL set (core + standards), not opt-in. A standard this project
 doesn't hold gets a one-line dated N/A stub, never omitted — e.g.
 `ui.md — N/A, no frontend (2026-07-15)` — so every standard has one home and
-facts never scatter. Replace the stub with real facts the moment they exist.
+facts never scatter. Replace the stub with real facts the moment they exist. Beyond this baseline, add a new SPECIFICALLY-NAMED bin whenever a durable fact fits none of the existing bins (name it for its domain, index it) — never a `misc`/`other` catch-all (see SKILL §5 'New bins on demand').
 Same entry rules as the core bins.
 
 Bin entries: one fact per line/short block · absolute dates · supersede in

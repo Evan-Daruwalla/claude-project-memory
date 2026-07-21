@@ -226,6 +226,14 @@ re-reading the codebase — and without loading everything.
   records that the standard was considered. Replace the stub with real facts
   the moment they exist. (Preference: an empty bin beats a fact scattered
   across three other bins.)
+- **New bins on demand — specific, never a catch-all.** The core + standards
+  set is the baseline, not a ceiling. When a durable fact fits none of the
+  existing bins, CREATE A NEW bin named for its specific domain (e.g.
+  `mcp-setup.md`, `deployment.md`) and add its line to INDEX — never a
+  `misc`/`other`/`general` catch-all, and never force the fact into an
+  ill-fitting bin. The name must describe a specific domain; if you can't name
+  it specifically, the fact belongs in an existing bin. Keeps "one obvious
+  home" true as the project grows.
 - **What goes in**: only facts expensive to rediscover or dangerous to forget —
   invariants, protocols, decisions with reasons, measured results, constraints.
   NOT what grep answers instantly, NOT session narrative (that's the record's
