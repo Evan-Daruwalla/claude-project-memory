@@ -127,6 +127,12 @@ verifies your TOC anchors.
 model works through TASK BREAKDOWN top to bottom, one task at a time, and
 checks off SUCCESS CRITERIA.**
 
+**GOAL:** <ONE paragraph stating the exact goal of this plan — what will
+exist when it is done, for whom, and the single sentence a fresh session
+reads to stay squarely on track. Not vision, not process: the goal.
+(Required, always at the top of the file — added 2026-07-22, Evan's
+proposal.)>
+
 **SCOPE GUARD (decided <YYYY-MM-DD>): <hard scope limits — what this plan must
 NOT touch. If a task seems to require it, STOP and report.>**
 <!-- scope guard optional; include when the project has live state to protect -->

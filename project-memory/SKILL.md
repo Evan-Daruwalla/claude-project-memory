@@ -155,6 +155,9 @@ from the code instead of asking. Only draft once the tree is settled — a PRD
 written over unresolved forks bakes in guesses a cheaper model can't unwind later.
 
 **Writing/updating a PRD**: use templates.md §3 (the 7 numbered sections).
+Every PRD opens with the one-paragraph **GOAL** block at the very top of the
+file (see §3) — write it FIRST; it is the sentence that keeps every later
+session squarely on track.
 Tasks must be small enough for a cheaper model to finish alone, each naming
 its files and its done-check. Scope decisions get dated ("decided
 YYYY-MM-DD"). Anything needing the owner's accounts/keys/purchases is marked
