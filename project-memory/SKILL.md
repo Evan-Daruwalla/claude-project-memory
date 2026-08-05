@@ -264,6 +264,81 @@ re-reading the codebase — and without loading everything.
 - **Precedence**: CLAUDE.md/HANDOFF override bin contents on conflict. Bins
   govern memory mechanics, never how the owner wants code written.
 
+### 5.1 The codebase DIRECTORY (`.claude/codebase-memory/DIRECTORY.md`)
+
+A **map of the tree**, not a bin of facts: what each module IS, what the entry
+points are, which modules are load-bearing, and what nothing imports. Bins
+answer "what must I not get wrong?"; the directory answers "what is here and
+what depends on what?" — the question every cold session currently re-derives
+with a dozen tool calls before it can start.
+
+- **Boundary vs `architecture.md`, stated so facts stop scattering:** *if it
+  changes when you MOVE A FILE, it belongs in DIRECTORY; if it changes when you
+  CHANGE YOUR MIND, it belongs in architecture.md.* Directory = where things
+  are and what imports what (navigational, mechanically derivable).
+  architecture.md = why it is built that way (decisions, rationale, tradeoffs).
+- **Contents**, in this order:
+  1. **Header** — generated date, the **commit SHA it reflects**, the staleness
+     commands pasted verbatim so the next session reruns them identically, and
+     which directories are mapped per-module vs summarized. No VCS? Say so in
+     the header and treat the map as unverifiable — re-derive on read rather
+     than inventing a version marker.
+  2. **Tree** — one line per directory/module: what it IS, in its own terms.
+     Not how it works, not its API. If the line would change on a refactor that
+     moved nothing, it is architecture, not directory.
+  3. **Entry points** — what a human, a scheduler, or CI actually invokes.
+     Distinguish "runs the thing" from "imported by the thing", and look past
+     imports entirely: CLI dispatch tables, `__main__`, hook and plugin config,
+     route decorators, scheduled jobs, package scripts.
+  4. **The spine** — the most-imported modules, with counts. These are the
+     blast centers: a change there reaches everything, and it is where an
+     audit's targeting pass should point first.
+  5. **Unreferenced** — modules nothing imports, and code no test touches.
+     Cheap to compute, and reliably surprising.
+- **Counts are grepped, never estimated.** Items 4–5 are the only numbers in
+  this artifact, which makes them its entire fabrication surface. Derive each
+  with a real command, RECORD THAT COMMAND in the file, and when the language's
+  import forms defeat a mechanical count (dynamic imports, star imports,
+  re-exports, aliasing), write what you could count and NAME what you could not.
+  Never a guessed number; never a count that silently covers part of the tree.
+- **"Unreferenced" means unreferenced BY STATIC IMPORT** — label it that way in
+  the file, and check it against item 3's dynamic surfaces before believing it.
+  A live module listed as dead is the worst thing this file can say: it invites
+  a deletion.
+- **Staleness is THE failure mode** — a stale map is worse than no map, because
+  it sends a session confidently to a file that moved. The halves rot at
+  different rates, so they get different checks:
+  - Items 2–3 (tree, entry points) go stale only when files APPEAR, VANISH, or
+    MOVE — `git diff --name-status --diff-filter=ADR <sha>..HEAD -- <mapped
+    dirs>`; empty output means the map still holds.
+  - Items 4–5 (spine, unreferenced) go stale on any edit to an import line, so
+    they get no cheap check. Treat them as EXPIRING: re-derive before letting
+    them steer where work goes.
+  Do NOT use `git diff --stat` here — it fires on content-only edits (2 of 3
+  sampled real commits), and a check that cries wolf gets ignored within a week.
+- **Regenerate, don't hand-edit.** Items 3–5 are mechanically derivable — rerun
+  the recorded commands. Only item 2's annotations are human-written; preserve
+  those across regenerations.
+- **Read protocol**: read DIRECTORY at COLD ENTRY, and before any change that
+  spans modules. Run its staleness check FIRST, and treat what it says as a
+  CLAIM — good enough to target work, never good enough to conclude from. Never
+  read it in place of a file you are about to edit.
+- **Write protocol**: update it when the STRUCTURE changes — a file added,
+  deleted, or moved; an entry point gained or lost — not on every commit. A
+  directory that demands updating on every commit is one nobody updates.
+- **Size rule, applied out loud**: this file earns its place only if a session
+  will read all of it. Past roughly 200 lines, map at directory granularity and
+  keep per-module lines only inside the directories the project actually works
+  in — and SAY in the header which ones you summarized. A map silently covering
+  half the tree reads exactly like one covering all of it.
+- **When to build one**: at bootstrap for a codebase big enough that the tree is
+  not obvious at a glance (roughly >15 source files), or the first time a
+  session spends real effort mapping the surface. A five-file project does not
+  need one — say so and skip it rather than generating ceremony.
+- **Never invent a purpose line.** If you cannot tell what a module is for from
+  its code and docs, write `— purpose unclear, not yet traced`. A confident
+  wrong label is what makes a map actively harmful.
+
 ## 6. DRIFT-CHECK ("verify the docs", "drift check", "is HANDOFF still true?")
 
 The verification arm of the system: HANDOFF.md is the only live snapshot, and a

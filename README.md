@@ -107,3 +107,5 @@ Requires `node` on PATH.
 - `project-memory/hooks/pm-cadence.js` — counts prompts, injects the reminder.
 - `project-memory/hooks/pm-cadence-autoinit.js` — auto-creates the config on
   first invocation.
+- `project-memory/profiles/research.md`, `profiles/website.md` — per-project-type
+  starting points for the bins.

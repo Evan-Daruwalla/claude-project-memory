@@ -130,8 +130,7 @@ checks off SUCCESS CRITERIA.**
 **GOAL:** <ONE paragraph stating the exact goal of this plan — what will
 exist when it is done, for whom, and the single sentence a fresh session
 reads to stay squarely on track. Not vision, not process: the goal.
-(Required, always at the top of the file — added 2026-07-22, Evan's
-proposal.)>
+(Required, always at the top of the file.)>
 
 **SCOPE GUARD (decided <YYYY-MM-DD>): <hard scope limits — what this plan must
 NOT touch. If a task seems to require it, STOP and report.>**
@@ -217,8 +216,51 @@ Standards bins (only those the codebase actually commits to):
 - data.md — schema/migration + API/interface contracts (updated <YYYY-MM-DD>)
 - tooling.md — build/lint/format/CI + required commands (updated <YYYY-MM-DD>)
 
+Map (not a bin — see SKILL §5.1):
+- DIRECTORY.md — tree map + entry points + spine + unreferenced (reflects <sha>, <YYYY-MM-DD>)
+
 Cross-bin invariants:
 - <only ones short enough to always load>
+```
+
+`DIRECTORY.md` — only for a codebase big enough that the tree is not obvious
+(roughly >15 source files); skip it and say so otherwise:
+
+```markdown
+# codebase directory — <project>
+
+Reflects commit `<sha>` (<YYYY-MM-DD>).
+<!-- no VCS? replace with: "no VCS — unverifiable, re-derive on read" -->
+**Structure check (tree + entry points):** `git diff --name-status
+--diff-filter=ADR <sha>..HEAD -- <mapped dirs>` — empty = still accurate.
+(Not `--stat`: that fires on content-only edits and trains you to ignore it.)
+**Spine + unreferenced:** no cheap check — re-derive before relying on them.
+Map, not rationale: moving a file changes this doc; changing your mind changes
+`architecture.md`.
+**Mapped per-module:** <dirs> · **Summarized only:** <dirs, or "none">
+
+## Tree
+- `<dir>/` — <what it IS, one line>
+  - `<module>.<ext>` — <what it IS>   <!-- "— purpose unclear, not yet traced" if genuinely unknown; never guess -->
+
+## Entry points (what actually gets invoked)
+- `<cmd or path>` — <run by whom: human / scheduler / CI> — <what it does>
+<!-- look past imports: CLI dispatch, __main__, hook/plugin config, route
+     decorators, scheduled jobs, package scripts -->
+
+## Spine (most-imported — blast centers)
+Derived by: `<the exact command, so this regenerates identically>`
+- `<module>` — imported by <N> (<names>)
+<!-- forms you could not count (dynamic/star/re-export)? name them; never guess -->
+
+## Unreferenced by static import (nothing imports / no test touches)
+Derived by: `<the exact command>`
+- `<module>` — <no importer | no test | both>
+<!-- check against Entry points before believing: a live module listed dead
+     invites a deletion -->
+
+<!-- Tree lines are hand-written and preserved. Entry points / spine /
+     unreferenced are mechanically derived — regenerate, do not hand-edit. -->
 ```
 
 Bootstrap the FULL set (core + standards), not opt-in. A standard this project

@@ -108,4 +108,53 @@ function main() {
   return 0;
 }
 
+// self-test: this hook CREATES the cadence config, so a silent break means a
+// project never starts counting at all.
+function runCanary() {
+  const os = require("os");
+  const { spawnSync } = require("child_process");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "pmauto-canary-"));
+  let pass = 0, fail = 0;
+  const check = (c, d) => { if (c) pass++; else { fail++; console.log("  FAIL: " + d); } };
+  const fire = (cwd, skill) => spawnSync(process.execPath, [__filename], {
+    input: JSON.stringify({ cwd, tool_input: { skill: skill === undefined ? "project-memory" : skill } }),
+    encoding: "utf8",
+  });
+  try {
+    const proj = path.join(root, "proj");
+    fs.mkdirSync(proj, { recursive: true });
+    const cfg = path.join(proj, ".claude", "pm-cadence.json");
+
+    let r = fire(proj);
+    check(fs.existsSync(cfg), "creates .claude/pm-cadence.json on a project-memory invocation");
+    let parsed = null;
+    try { parsed = JSON.parse(fs.readFileSync(cfg, "utf8")); } catch { /* stays null */ }
+    check(parsed !== null, "the file it writes is valid JSON");
+    check(parsed && parsed.record_entry === 3, "seeds record_entry: 3");
+    check(/PM-CADENCE/.test(r.stdout || ""), "announces the auto-creation");
+
+    const before = fs.readFileSync(cfg, "utf8");
+    r = fire(proj);
+    check(fs.readFileSync(cfg, "utf8") === before, "never overwrites an existing config");
+    check((r.stdout || "").indexOf("additionalContext") === -1, "stays quiet once configured");
+
+    const bare = path.join(root, "bare");
+    fs.mkdirSync(bare);
+    fire(bare, "some-other-skill");
+    check(!fs.existsSync(path.join(bare, ".claude", "pm-cadence.json")),
+      "another skill does not create a config");
+
+    r = spawnSync(process.execPath, [__filename], { input: "not json", encoding: "utf8" });
+    check(r.status === 0, "malformed stdin never blocks the tool call");
+
+    const ok = fail === 0;
+    console.log(`CANARY ${ok ? "PASS" : "FAIL"} ${pass}/${pass + fail}`);
+    return ok;
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+if (process.argv.includes("--canary")) process.exit(runCanary() ? 0 : 1);
 process.exit(main());
+
