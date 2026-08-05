@@ -44,11 +44,18 @@ remembering to check:
 - **`hooks/pm-cadence-autoinit.js`** (`PreToolUse`, matcher `Skill`) fires on
   EVERY skill invocation project-wide; it no-ops unless `tool_input.skill ===
   "project-memory"`. The first time this skill is invoked in a project, if
-  `.claude/pm-cadence.json` doesn't exist yet AND the project has no
-  `UserPromptSubmit` hook of its own already (that second check is how a
-  project already running its own cadence mechanism avoids getting a second
-  one — no hardcoding, just "does this project already have a cadence hook"),
-  it auto-creates the config with defaults and injects a context note.
+  `.claude/pm-cadence.json` doesn't exist yet AND the directory carries a
+  PROJECT MARKER (`.git`, `HANDOFF.md`, `PRD_ROADMAP.md`, `CLAUDE.md`, or a
+  language manifest) AND the project has no `UserPromptSubmit` hook of its own
+  already (that last check is how a project already running its own cadence
+  mechanism avoids getting a second one — no hardcoding, just "does this
+  project already have a cadence hook"), it auto-creates the config with
+  defaults and injects a context note. **The marker check exists because
+  without it the hook seeds a counter in whatever directory the session was
+  opened in — including a parent folder that merely CONTAINS projects, which
+  then accumulates prompts belonging to no project while every real project
+  undercounts. Observed live: a container dir reached `_count` 72 beside a real
+  project sitting at 13.** A marker-less directory gets no config and says so.
 - **`hooks/pm-cadence.js`** (`UserPromptSubmit`) then counts prompts per
   project against that config and injects a reminder every Nth subpart-cadence.
 

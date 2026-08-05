@@ -18,6 +18,11 @@
  * Skip conditions (no config created):
  *   - tool_input.skill !== "project-memory"
  *   - .claude/pm-cadence.json already exists
+ *   - the cwd carries no PROJECT MARKER (see PROJECT_MARKERS). Without this
+ *     the hook happily seeds a counter in whatever directory the session was
+ *     opened in — including a parent folder that merely CONTAINS projects,
+ *     which then accumulates prompts belonging to no project while each real
+ *     project undercounts. Observed live: a container dir reached _count 72.
  *   - the project's own .claude/settings.json already registers a
  *     UserPromptSubmit hook (assume it runs its own cadence mechanism —
  *     this lets a project with a pre-existing cadence hook avoid a
@@ -41,6 +46,32 @@ const DEFAULTS = {
   _last_reminder_iso: null,
   _auto_created: true,
 };
+
+// A directory only counts as a project if it carries one of these. A parent
+// folder that merely CONTAINS projects has none of them, so it never gets a
+// counter. Deliberately broad: a VCS root, this doc system's own artifacts, an
+// agent-instruction file, or any common language manifest.
+const PROJECT_MARKERS = [
+  ".git",
+  "HANDOFF.md",
+  "PRD_ROADMAP.md",
+  "CLAUDE.md",
+  "package.json",
+  "pyproject.toml",
+  "setup.py",
+  "Cargo.toml",
+  "go.mod",
+  "pom.xml",
+  "Gemfile",
+  "composer.json",
+];
+
+function projectMarker(cwd) {
+  for (const m of PROJECT_MARKERS) {
+    try { if (fs.existsSync(path.join(cwd, m))) return m; } catch { /* keep looking */ }
+  }
+  return null;
+}
 
 function readStdin() {
   try {
@@ -91,6 +122,23 @@ function main() {
   if (fs.existsSync(cfgPath)) return 0; // already configured
   if (hasOwnCadenceHook(cwd)) return 0; // project runs its own mechanism
 
+  // No project marker => this is probably a parent folder that CONTAINS
+  // projects, not a project. Seeding a counter here would collect prompts that
+  // belong to no project while every real project undercounts. Say so rather
+  // than skipping silently — a dormant cadence with no explanation is the
+  // failure mode this hook exists to prevent.
+  if (!projectMarker(cwd)) {
+    emit(
+      "[PM-CADENCE] No cadence config was auto-created here: " + cwd + " carries " +
+        "no project marker (.git, HANDOFF.md, PRD_ROADMAP.md, CLAUDE.md, or a " +
+        "language manifest), so it looks like a folder that CONTAINS projects " +
+        "rather than a project. Re-run from the project directory, or — if this " +
+        "IS the project — bootstrap it (/project-memory §1) or create " +
+        ".claude/pm-cadence.json by hand, and cadence starts on the next prompt."
+    );
+    return 0;
+  }
+
   try {
     fs.mkdirSync(path.join(cwd, ".claude"), { recursive: true });
     fs.writeFileSync(cfgPath, JSON.stringify(DEFAULTS, null, 2) + "\n");
@@ -123,6 +171,7 @@ function runCanary() {
   try {
     const proj = path.join(root, "proj");
     fs.mkdirSync(proj, { recursive: true });
+    fs.writeFileSync(path.join(proj, "HANDOFF.md"), "# Handoff\n"); // project marker
     const cfg = path.join(proj, ".claude", "pm-cadence.json");
 
     let r = fire(proj);
@@ -144,6 +193,31 @@ function runCanary() {
     check(!fs.existsSync(path.join(bare, ".claude", "pm-cadence.json")),
       "another skill does not create a config");
 
+    // a folder that CONTAINS projects is not a project: no marker, no counter
+    const container = path.join(root, "container");
+    fs.mkdirSync(path.join(container, "someproject"), { recursive: true });
+    fs.writeFileSync(path.join(container, "someproject", "HANDOFF.md"), "# Handoff\n");
+    r = fire(container);
+    check(!fs.existsSync(path.join(container, ".claude", "pm-cadence.json")),
+      "marker-less container dir gets NO counter");
+    check(/no project marker/.test(r.stdout || ""),
+      "and says why, rather than skipping silently");
+
+    // every marker in the list must actually be recognised
+    let markersOk = true;
+    for (const m of PROJECT_MARKERS) {
+      const d = path.join(root, "m-" + m.replace(/[^\w]/g, "_"));
+      fs.mkdirSync(d, { recursive: true });
+      if (m === ".git") fs.mkdirSync(path.join(d, ".git"));
+      else fs.writeFileSync(path.join(d, m), "x");
+      fire(d);
+      if (!fs.existsSync(path.join(d, ".claude", "pm-cadence.json"))) {
+        markersOk = false;
+        console.log("    marker not honoured: " + m);
+      }
+    }
+    check(markersOk, `all ${PROJECT_MARKERS.length} project markers are honoured`);
+
     r = spawnSync(process.execPath, [__filename], { input: "not json", encoding: "utf8" });
     check(r.status === 0, "malformed stdin never blocks the tool call");
 
@@ -157,4 +231,3 @@ function runCanary() {
 
 if (process.argv.includes("--canary")) process.exit(runCanary() ? 0 : 1);
 process.exit(main());
-
