@@ -1,18 +1,15 @@
 ---
 name: project-memory
-description: >
-  A project memory + execution-doc system for Claude Code, built around four durable artifacts:
-  HANDOFF.md (the single live snapshot) + an append-only chronological record + a standing
-  PRD_ROADMAP.md + per-project codebase-memory bins. One skill, six workflows: BOOTSTRAP the
-  system in a new project; append a RECORD ENTRY mid-session; end-of-session HANDOFF sync; write
-  a PRD or EXECUTE its next open task; maintain CODEBASE-MEMORY bins; DRIFT-CHECK the HANDOFF's
-  claims against reality. Use when the user says "/project-memory", "handoff", "update the docs",
-  "update the record/HANDOFF", "append the record", "log this", "record this", "bootstrap the
-  memory/doc system", "set up the docs", "next task", "run the next PRD task", "continue the
-  plan/roadmap", "check the bins", "update the bins", "drift check", "verify the docs", "is
-  HANDOFF still true" — or when wrapping up a work session, starting a project that lacks
-  HANDOFF.md, or given no direction in a project that has a PRD_ROADMAP.md. Exact file skeletons
-  live in templates.md (read it before creating any doc).
+description: >-
+  A project memory + execution-doc system: HANDOFF.md (only live snapshot) +
+  append-only record + standing PRD_ROADMAP.md + codebase-memory bins. Six
+  workflows: BOOTSTRAP, RECORD ENTRY, HANDOFF sync, PRD write / EXECUTE next
+  task, BINS, DRIFT-CHECK. Use when: "/project-memory", "handoff", "update the
+  docs/record", "log this", "record this", "bootstrap the memory system",
+  "next task", "continue the roadmap", "drift check", "is HANDOFF still true"
+  — or when wrapping up a session, in a project lacking HANDOFF.md, or given
+  no direction where a PRD_ROADMAP.md exists. Read templates.md before
+  creating any doc.
 ---
 
 # project-memory — the doc/memory system
