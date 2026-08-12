@@ -123,8 +123,16 @@ function main() {
   try {
     // write+rename, never a bare write: the hook has a hard timeout, and a kill
     // mid-write leaves truncated JSON that bricks the cadence. rename() is
-    // atomic on the same filesystem, so it also serializes concurrent sessions.
-    const tmp = cfgPath + ".tmp";
+    // atomic on the same filesystem, so no reader ever sees a partial file.
+    //
+    // The tmp name carries the pid. With a FIXED name, two sessions in one
+    // project wrote the SAME tmp file and one could rename a half-written copy
+    // over the live config — caught by the corrupt-config path, which silently
+    // resets _count to 0 and skips a reminder cycle. This closes that.
+    // It does NOT close the lost update on _count itself: two sessions can still
+    // read the same value and both write count+1. That needs an O_EXCL lockfile,
+    // not a rename, and is deliberately not attempted here.
+    const tmp = `${cfgPath}.${process.pid}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(cfg, null, 2) + "\n");
     fs.renameSync(tmp, cfgPath);
   } catch {
