@@ -119,7 +119,20 @@ function main() {
   const cwd = (j && j.cwd) || process.cwd();
   const cfgPath = path.join(cwd, ".claude", "pm-cadence.json");
 
-  if (fs.existsSync(cfgPath)) return 0; // already configured
+  // Checking cwd ONLY disagrees with pm-cadence.js, which resolves the config
+  // by walking up to the nearest ancestor. Invoking the skill from a
+  // marker-bearing SUBDIRECTORY of an already-configured project therefore
+  // created a second config, which the counter then preferred — the parent's
+  // cadence silently froze and a fresh one started at 0. Observed live: a root
+  // config at _count 155 beside a subproject config at _count 0.
+  // A reminder that stops firing is silent by construction, so both hooks must
+  // answer "which dir is the project?" the same way.
+  for (let dir = cwd; ; ) {
+    if (fs.existsSync(path.join(dir, ".claude", "pm-cadence.json"))) return 0;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
   if (hasOwnCadenceHook(cwd)) return 0; // project runs its own mechanism
 
   // No project marker => this is probably a parent folder that CONTAINS
