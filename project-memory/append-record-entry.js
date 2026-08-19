@@ -254,6 +254,48 @@ function canary() {
   process.exit(fail === 0 ? 0 : 1);
 }
 
+
+// ---- standalone check (what the pre-commit hook calls) ---------------------
+// Validates a record file on its own terms, and — when a prior version is given
+// — that the new one only ADDED to it. This is the same logic appendEntry()
+// re-checks after writing, exposed so a gate can enforce it on a record that
+// was edited by hand, by another tool, or by a session that skipped the script.
+function checkRecord(text, priorText) {
+  const found = scanAppendices(text);
+  if (!found.length) return { ok: true, msg: 'no appendix headings — nothing to check' };
+
+  const seen = new Set();
+  for (const f of found) {
+    if (seen.has(f.letter)) {
+      return { ok: false, msg: `duplicate Appendix ${f.letter} (dash style is ignored — two entries share a letter)` };
+    }
+    seen.add(f.letter);
+  }
+  for (let k = 1; k < found.length; k++) {
+    if (found[k].index <= found[k - 1].index) {
+      return { ok: false, msg: `appendix letters out of order: ${found[k - 1].letter} appears before ${found[k].letter}` };
+    }
+  }
+  const tocCount = text.split('\n').filter((l) => /^- \[[A-Z]+ /.test(l)).length;
+  if (tocCount !== found.length) {
+    return { ok: false, msg: `TOC lines (${tocCount}) != appendix headings (${found.length}) — an entry is missing its TOC line, or vice versa` };
+  }
+
+  if (priorText != null) {
+    const b = priorText.split('\n');
+    const a = text.split('\n');
+    let i = 0;
+    for (const line of b) {
+      let ok = false;
+      while (i < a.length) { if (a[i++] === line) { ok = true; break; } }
+      if (!ok) {
+        return { ok: false, msg: 'APPEND-ONLY VIOLATION: a previously committed line was modified or removed' };
+      }
+    }
+  }
+  return { ok: true, msg: `${found.length} appendices, letters unique and ordered, TOC balanced${priorText != null ? ', append-only preserved' : ''}` };
+}
+
 // ---- cli -------------------------------------------------------------------
 function getOpt(argv, flag) {
   const i = argv.indexOf(flag);
@@ -269,6 +311,20 @@ function getOpt(argv, flag) {
 function main() {
   const argv = process.argv.slice(2);
   if (argv.includes('--canary')) return canary();
+
+  // --check <file> [--against <prior>] : verify a record, write nothing.
+  const checkPath = getOpt(argv, '--check');
+  if (checkPath) {
+    if (!fs.existsSync(checkPath)) { console.error('no such file: ' + checkPath); process.exit(2); }
+    const againstPath = argv.includes('--against') ? getOpt(argv, '--against') : null;
+    if (againstPath && !fs.existsSync(againstPath)) { console.error('no such file: ' + againstPath); process.exit(2); }
+    const res = checkRecord(
+      fs.readFileSync(checkPath, 'utf8'),
+      againstPath ? fs.readFileSync(againstPath, 'utf8') : null
+    );
+    console.log((res.ok ? 'record OK: ' : 'record INVALID: ') + res.msg);
+    process.exit(res.ok ? 0 : 1);
+  }
 
   const recordPath = getOpt(argv, '--record');
   if (!recordPath) { console.error('usage: --record <path> [--next-letter | --title <t> --body <file>]'); process.exit(2); }
@@ -304,4 +360,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { letterToIndex, indexToLetter, slugify, nextFreeLetter, scanAppendices, appendEntry, verifyInvariants };
+module.exports = { checkRecord, letterToIndex, indexToLetter, slugify, nextFreeLetter, scanAppendices, appendEntry, verifyInvariants };
