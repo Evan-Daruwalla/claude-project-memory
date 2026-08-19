@@ -33,6 +33,16 @@ Explicitly OUTSIDE this system: project-specific operational artifacts (daily
 reports, run logs, generated dashboards) that have their own rules — never
 fold them in.
 
+**Cross-session rule — where "latest" comes from.** Other sessions write to
+these files between your reads. Anything about the record's CURRENT position —
+the latest appendix, the next free letter, canary counts, push state — is read
+from the live artifact at the moment you act, never from HANDOFF's summary of
+it and never from what this session remembers reading earlier. HANDOFF's
+"appendices have reached X" note is a **reading, not a fact**: it was stale
+within a day on both occasions it existed (records BT, BN). The same applies to
+`git status`'s `ahead N` — ask `git ls-remote`, not a cached ref (gotchas.md).
+Cheap rule of thumb: if another session could have changed it, re-derive it.
+
 ## 0. FIRST-LOAD CADENCE SETUP (before any workflow, once per project)
 
 Cadence firing is made DETERMINISTIC by two hooks, not by the model
@@ -116,9 +126,31 @@ ever reads this section. The model's only remaining job:
 ## 2. RECORD ENTRY (mid-session "log this" — no full handoff ceremony)
 
 1. Find the record file and its convention (check HANDOFF.md §Documentation).
-   For an appendix-style record: next `# Appendix <XX> - <Title> (<date>)` —
-   grep `"^# Appendix"` for the last letter, add the matching TOC line in the
-   front-matter. For a dated-section record: `## YYYY-MM-DD — <title>`.
+   **Appendix-style records: APPEND WITH THE SCRIPT, never by hand.**
+
+   ```
+   node ~/.claude/skills/project-memory/append-record-entry.js \
+     --record "<path>" --title "<title>" --date "<from a real `date` call>" \
+     --body <file>            # add --dry-run to preview
+   ```
+
+   It derives the next letter from a LIVE scan, refuses a duplicate across any
+   dash style, places the TOC line after the last existing one, computes the
+   anchor with the renderer's own slug algorithm, and re-checks four invariants
+   after writing (append-only, no duplicate letters, letters ordered,
+   TOC/heading counts equal) — rolling the write back if any fails.
+
+   **Hand-splicing is the documented failure mode, not a shortcut.** Sessions
+   wrote five bespoke splice scripts in one week; one appended a duplicate
+   `BM` over three other sessions' entries because it derived "next" from the
+   last entry IT had read, and its own guard missed the collision because that
+   entry used a different dash. Record BT. The instruction to grep for the last
+   letter was already here and was followed — that is the point: this is a gate,
+   and gates get scripts.
+
+   A dated-section record (`## YYYY-MM-DD — <title>` sections in `docs/record_<date>.md`)
+   is a different convention — the script refuses it rather than guessing; hand-
+   append there, matching the file's existing shape.
 2. Entry content: absolute date + approx time ("2026-01-15 ~16:40"); WHAT
    changed · WHY (problem, tradeoff) · HOW (approach, especially non-obvious
    or after an abandoned attempt); any bug as symptom → root cause → fix;
