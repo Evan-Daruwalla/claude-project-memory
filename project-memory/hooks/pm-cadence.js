@@ -164,7 +164,13 @@ function runCanary() {
     for (let i = 0; i < 3; i++) r = fire(deep);
     check(read()._count === 3, "counts a session started in a SUBdirectory (ancestor config)");
     check(/PM-CADENCE/.test(r.stdout || ""), "reminder fires on the Nth prompt");
-    check(!fs.existsSync(cfg + ".tmp"), "atomic write leaves no .tmp behind");
+    // Was `!fs.existsSync(cfg + ".tmp")` — a filename this code has NEVER
+    // written. Temp files are `<cfg>.<pid>.tmp` (per-pid since record BF), so
+    // the assertion tested the absence of something that could not exist, and
+    // passed for the life of the file without touching the behaviour it names.
+    // Look at the DIRECTORY, which is what "leaves no .tmp behind" means.
+    const strays = fs.readdirSync(path.dirname(cfg)).filter((f) => f.endsWith(".tmp"));
+    check(strays.length === 0, `atomic write leaves no .tmp behind (found: ${strays.join(", ") || "none"})`);
 
     fs.writeFileSync(cfg, '{"record_entry":3,"_cou');
     r = fire(proj);
