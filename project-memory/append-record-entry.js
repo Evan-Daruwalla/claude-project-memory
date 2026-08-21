@@ -131,12 +131,60 @@ function appendEntry(opts) {
 
   if (dryRun) return { ok: true, letter, heading, tocLine, slug, dryRun: true };
 
-  fs.writeFileSync(recordPath, after, 'utf8');
-
-  const check = verifyInvariants(before, fs.readFileSync(recordPath, 'utf8'), letter);
+  // Verify BEFORE touching the file, then publish atomically.
+  //
+  // The previous shape was: writeFileSync -> re-read -> verify -> on failure
+  // writeFileSync(before) to "roll back". Every part of that was a hazard:
+  //   * writeFileSync truncates then writes, so a concurrent reader could
+  //     observe a half-file and treat it as authoritative. Measured directly:
+  //     an 8-way run on a 1,046,856-byte record was caught at 458,878 bytes
+  //     mid-write, and destroyed files landed on exact 4096-byte boundaries.
+  //   * the "rollback" wrote a STALE in-memory snapshot over whatever another
+  //     process had since committed — the rollback WAS the corruption.
+  //   * it printed "rolled back", which reads as no-harm-done at the exact
+  //     moment it may have destroyed the record.
+  // Measured destruction was bimodal and scaled with size: none below ~130KB,
+  // ~25% of trials at 350KB, 3 of 5 trials at 433KB losing up to 146 of 164
+  // appendices, 10/10 at 1MB. The real records are 336KB-914KB.
+  //
+  // Now: an O_EXCL lockfile makes read-modify-write mutually exclusive, and a
+  // temp-file + rename publishes in one step. There is nothing to roll back —
+  // either the new file lands whole or the old one is untouched.
+  const check = verifyInvariants(before, after, letter);
   if (!check.ok) {
-    fs.writeFileSync(recordPath, before, 'utf8');       // roll back
-    return { ok: false, code: 1, msg: 'invariant failed AFTER write, rolled back: ' + check.msg };
+    return { ok: false, code: 1, msg: 'invariant failed, file NOT modified: ' + check.msg };
+  }
+
+  const lockPath = recordPath + '.lock';
+  let lockFd;
+  try {
+    lockFd = fs.openSync(lockPath, 'wx');            // O_EXCL: fails if held
+  } catch (e) {
+    if (e.code === 'EEXIST') {
+      return { ok: false, code: 1, msg: 'another append is in progress (' + lockPath + ') — retry, or remove the lock if it is stale' };
+    }
+    return { ok: false, code: 1, msg: 'could not take the append lock: ' + (e.code || e.message) };
+  }
+
+  const tmp = recordPath + '.' + process.pid + '.tmp';
+  try {
+    // Re-read under the lock: another process may have appended between our
+    // first read and acquiring it. Refuse rather than clobber.
+    const current = fs.readFileSync(recordPath, 'utf8');
+    if (current !== before) {
+      return { ok: false, code: 1, msg: 'the record changed while this entry was being prepared — nothing written; re-run to pick up the new letter' };
+    }
+    fs.writeFileSync(tmp, after, 'utf8');
+    fs.renameSync(tmp, recordPath);                   // atomic publish
+  } catch (e) {
+    return { ok: false, code: 1, msg: 'append failed, record NOT modified: ' + (e.code || e.message) };
+  } finally {
+    // tmp is declared outside the try so it is always reachable here: a
+    // transient rename failure would otherwise leave it orphaned beside the
+    // record. Unlinking a file that was successfully renamed is a no-op.
+    try { fs.unlinkSync(tmp); } catch (_) {}
+    try { fs.closeSync(lockFd); } catch (_) {}
+    try { fs.unlinkSync(lockPath); } catch (_) {}
   }
   return { ok: true, letter, heading, tocLine, slug };
 }
@@ -261,6 +309,24 @@ function canary() {
 // re-checks after writing, exposed so a gate can enforce it on a record that
 // was edited by hand, by another tool, or by a session that skipped the script.
 function checkRecord(text, priorText) {
+  // The append-only comparison runs FIRST. Returning "nothing to check" before
+  // looking at priorText meant a DELETED or emptied record passed the gate:
+  // `git show` of a staged deletion yields a 0-byte file, which has no
+  // headings, so the fail-closed pre-commit step printed "record invariants OK"
+  // and allowed the record to be destroyed.
+  if (priorText != null) {
+    const pb = priorText.split('\n');
+    const pa = text.split('\n');
+    let pi = 0;
+    for (const line of pb) {
+      let ok = false;
+      while (pi < pa.length) { if (pa[pi++] === line) { ok = true; break; } }
+      if (!ok) {
+        return { ok: false, msg: 'APPEND-ONLY VIOLATION: a previously committed line was modified or removed' };
+      }
+    }
+  }
+
   const found = scanAppendices(text);
   if (!found.length) return { ok: true, msg: 'no appendix headings — nothing to check' };
 
@@ -281,18 +347,6 @@ function checkRecord(text, priorText) {
     return { ok: false, msg: `TOC lines (${tocCount}) != appendix headings (${found.length}) — an entry is missing its TOC line, or vice versa` };
   }
 
-  if (priorText != null) {
-    const b = priorText.split('\n');
-    const a = text.split('\n');
-    let i = 0;
-    for (const line of b) {
-      let ok = false;
-      while (i < a.length) { if (a[i++] === line) { ok = true; break; } }
-      if (!ok) {
-        return { ok: false, msg: 'APPEND-ONLY VIOLATION: a previously committed line was modified or removed' };
-      }
-    }
-  }
   return { ok: true, msg: `${found.length} appendices, letters unique and ordered, TOC balanced${priorText != null ? ', append-only preserved' : ''}` };
 }
 
@@ -310,13 +364,18 @@ function getOpt(argv, flag) {
 
 function main() {
   const argv = process.argv.slice(2);
-  if (argv.includes('--canary')) return canary();
+  // Mode flags are only honoured in a POSITION that is not a flag's value.
+  // `argv.includes('--canary')` let `--title "--canary"` run the self-test and
+  // exit 0 having appended nothing — a success exit on a silent no-op.
+  const VALUE_FLAGS = new Set(['--record', '--title', '--date', '--body', '--check', '--against']);
+  const positional = argv.filter((a, i) => !(i > 0 && VALUE_FLAGS.has(argv[i - 1])));
+  if (positional.includes('--canary')) return canary();
 
   // --check <file> [--against <prior>] : verify a record, write nothing.
   const checkPath = getOpt(argv, '--check');
   if (checkPath) {
     if (!fs.existsSync(checkPath)) { console.error('no such file: ' + checkPath); process.exit(2); }
-    const againstPath = argv.includes('--against') ? getOpt(argv, '--against') : null;
+    const againstPath = positional.includes('--against') ? getOpt(argv, '--against') : null;
     if (againstPath && !fs.existsSync(againstPath)) { console.error('no such file: ' + againstPath); process.exit(2); }
     const res = checkRecord(
       fs.readFileSync(checkPath, 'utf8'),
@@ -330,7 +389,7 @@ function main() {
   if (!recordPath) { console.error('usage: --record <path> [--next-letter | --title <t> --body <file>]'); process.exit(2); }
   if (!fs.existsSync(recordPath)) { console.error('no such record: ' + recordPath); process.exit(2); }
 
-  if (argv.includes('--next-letter')) {
+  if (positional.includes('--next-letter')) {
     console.log(nextFreeLetter(fs.readFileSync(recordPath, 'utf8')));
     return;
   }
@@ -348,7 +407,7 @@ function main() {
     title,
     date,
     body: fs.readFileSync(bodyFile, 'utf8'),
-    dryRun: argv.includes('--dry-run'),
+    dryRun: positional.includes('--dry-run'),
   });
 
   if (!res.ok) { console.error('REFUSED: ' + res.msg); process.exit(res.code); }
