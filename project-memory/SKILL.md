@@ -262,7 +262,14 @@ re-reading the codebase — and without loading everything.
   only), `testing.md` (framework, test layout, what must
   be covered, frozen-test rules), `data.md` (schema/migration conventions,
   API/interface contracts), `tooling.md` (build/lint/format/CI + required
-  commands). **Bootstrap creates the FULL set (core + standards), not opt-in**:
+  commands), `disclosure.md` (**what may leave this project** — who the
+  non-code stakeholders are, what a case study / screenshot / demo / public
+  README may and may not show, and any standing external constraint on
+  outward-facing work). *Boundary vs `security.md`: security.md governs
+  the CODEBASE (secrets, auth, input handling) and its failure is a breach;
+  disclosure.md governs ARTIFACTS DERIVED from the project that go outside it,
+  and its failure is publishing something that should never have left.*
+  **Bootstrap creates the FULL set (core + standards), not opt-in**:
   a bin with no facts yet — or a standard this project doesn't hold — gets a
   ONE-LINE dated stub (`ui.md — N/A, no frontend (2026-…)`; `performance.md —
   empty, no perf work yet (2026-…)`), NEVER omitted. Why: every standard gets
@@ -288,6 +295,12 @@ re-reading the codebase — and without loading everything.
   security.md; hot paths always load performance.md. Never all bins by
   default. Bin facts are claims: when code disagrees, trust the code, fix the
   bin, note the correction.
+  **The protocol is not code-only.** Any task whose OUTPUT LEAVES THE PROJECT —
+  a case study, portfolio or resume entry, demo, screenshot, public README,
+  marketing or outreach copy — ALWAYS loads `disclosure.md`, the same way
+  security.md is always loaded for auth work. This is the one bin a non-code
+  task must read: without it such a task loads NO bins at all, which is how a
+  constraint that was correctly recorded still gets violated at publish time.
 - **Write protocol** (staleness is the failure mode): any change that alters a
   fact updates that bin the SAME session. Supersede in place ("(supersedes
   2026-01-10 entry: X)" when history matters). Cap ~150 lines/bin — compress

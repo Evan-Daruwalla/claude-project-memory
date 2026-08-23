@@ -215,6 +215,7 @@ Standards bins (only those the codebase actually commits to):
 - testing.md — framework, test layout, coverage/frozen rules (updated <YYYY-MM-DD>)
 - data.md — schema/migration + API/interface contracts (updated <YYYY-MM-DD>)
 - tooling.md — build/lint/format/CI + required commands (updated <YYYY-MM-DD>)
+- disclosure.md — what may leave the project: non-code stakeholders, what a case study / screenshot / demo / public README may show (updated <YYYY-MM-DD>)
 
 Map (not a bin — see SKILL §5.1):
 - DIRECTORY.md — tree map + entry points + spine + unreferenced (reflects <sha>, <YYYY-MM-DD>)
