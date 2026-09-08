@@ -1,0 +1,72 @@
+#!/bin/sh
+# Record-invariant gate — ONE executing copy, shared by every repo that holds an
+# append-only project record. Invoke from a repo's own pre-commit:
+#
+#   REC_GUARD="${HOME}/.claude/skills/project-memory/hooks/pre-commit-record"
+#   [ -f "$REC_GUARD" ] && { sh "$REC_GUARD" || exit 1; }
+#
+# WHY IT IS DELEGATED. The same block was inlined in exactly ONE repo's hook
+# (Skills) while five other repos held an append-only record and gated nothing —
+# so a hand-splice, the failure that silently overwrote another session's entry
+# in record BT, was blocked in one place and free everywhere else. Inlining a
+# copy per repo is how the SECRET gate's fixes kept landing on files that never
+# execute (2026-08-05); this exists so a fix to the record rules lands once.
+#
+# Fails CLOSED. A duplicate appendix letter, a deleted record, or a broken TOC is
+# exactly what this exists to prevent, and none of them are recoverable by the
+# next commit.
+#
+# Runs only when the record is actually staged, so it is a no-op on every other
+# commit in every repo.
+
+CHECKER="${HOME}/.claude/skills/project-memory/append-record-entry.js"
+
+# The record's own filename carries an em dash (U+2014), and `git diff
+# --name-only` octal-escapes non-ASCII paths under the default core.quotepath —
+# so it is read back FROM GIT with quotepath off and matched on an ASCII-only
+# substring. Embedding the literal filename here is how the twin-sync grep in
+# Skills' own hook got its bug.
+REC_MD=$(git -c core.quotepath=false diff --cached --name-only \
+  | grep -F -- "Full Chronological History.md" | head -1)
+
+[ -n "$REC_MD" ] || exit 0          # record not staged: nothing to check
+
+if [ ! -f "$CHECKER" ]; then
+  # Fail OPEN here, but LOUDLY: a missing checker is a broken install, not a bad
+  # commit, and wedging every commit in six repos over it is worse than saying so.
+  echo "record-check WARNING: checker not found at $CHECKER" >&2
+  echo "  record invariants NOT verified for this commit." >&2
+  exit 0
+fi
+
+STAGED=$(mktemp); PRIOR=$(mktemp)
+
+# A staged DELETION makes `git show :<path>` fail. Discarding that status left
+# $STAGED empty, which the checker correctly called "no appendix headings —
+# nothing to check", exit 0 — so the fail-CLOSED step printed "record invariants
+# OK" while deleting the append-only record (record BV, crit C3).
+if ! git show ":$REC_MD" > "$STAGED" 2>/dev/null; then
+  echo "" >&2
+  echo "cannot read the staged record blob (deleted or unreadable) -- commit BLOCKED." >&2
+  echo "The record is append-only; deleting it is never a valid commit." >&2
+  rm -f "$STAGED" "$PRIOR"
+  exit 1
+fi
+
+if git show "HEAD:$REC_MD" > "$PRIOR" 2>/dev/null; then
+  node "$CHECKER" --check "$STAGED" --against "$PRIOR"
+else
+  node "$CHECKER" --check "$STAGED"      # first commit of a new record
+fi
+check_status=$?
+rm -f "$STAGED" "$PRIOR"
+
+if [ "$check_status" -ne 0 ]; then
+  echo "" >&2
+  echo "record invariants FAILED -- commit BLOCKED." >&2
+  echo "Append entries with append-record-entry.js; do not hand-splice." >&2
+  exit 1
+fi
+
+echo "commit-gate: record invariants OK." >&2
+exit 0

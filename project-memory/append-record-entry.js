@@ -22,7 +22,10 @@
  *   - the duplicate check is dash-agnostic (-, en, em) so style drift cannot
  *     hide a collision
  *   - new headings are normalised to one dash style, so the drift stops
- *   - the TOC line lands after the LAST appendix line, found by scanning
+ *   - the TOC line lands after the LAST appendix line, found by scanning;
+ *     with ZERO existing lines it lands directly under the TOC's
+ *     "**Part II — Appendices**" header (templates.md §2), never under the
+ *     "Table of Contents" heading itself (that put Appendix A above Part I)
  *   - four invariants are checked BEFORE the file is touched, and the new text
  *     is published by temp-file + rename (there is no rollback path, because
  *     the rollback was itself the corruption — record BV.2)
@@ -58,6 +61,10 @@ const DASH = '[-‐‑‒–—―]';
 const HEADING_RE = new RegExp('^# Appendix ([A-Z]+)\\s*' + DASH + '\\s');
 const CANON_DASH = '-';        // 65 of 72 existing headings use ASCII hyphen
 const TOC_DASH = '—';     // TOC titles use an em dash (established pattern)
+
+// The TOC's Part II header from templates.md §2. Dash-agnostic for the same
+// reason HEADING_RE is: a hand-typed hyphen or en dash must not hide it.
+const PART_II_RE = new RegExp('^\\*\\*Part II\\s*' + DASH + '\\s*Appendices');
 
 // A line that LOOKS like an appendix heading but does not match HEADING_RE is
 // invisible to every check in this file — so nextFreeLetter can hand out a
@@ -227,17 +234,36 @@ function appendEntry(opts) {
   const lines = before.split('\n');
   const tocIdx = tocLines(before);
   let insertAt;
+  let warning = null;
   if (tocIdx.length) {
     insertAt = tocIdx[tocIdx.length - 1] + 1;
   } else {
-    // Bootstrap: a brand-new record has the "Table of Contents" heading and no
-    // entries under it yet. Land the first line just below the heading rather
-    // than refusing — refusing is what forced the hand-splice on entry A.
-    const tocHead = lines.findIndex((l) => /^#+\s*Table of Contents/i.test(l));
-    if (tocHead === -1) return { ok: false, code: 1, msg: 'no appendix TOC lines and no "Table of Contents" heading — refusing to guess placement' };
-    let k = tocHead + 1;
-    while (k < lines.length && lines[k].trim() === '') k++;
-    insertAt = k;
+    // ZERO existing appendix lines. templates.md §2 lays the TOC out as
+    // `**Part I — Original record**` (phase links) and then `**Part II —
+    // Appendices (chronological)**`, so the first appendix line belongs
+    // DIRECTLY under Part II. Landing it "just below the TOC heading" put
+    // Appendix A above the Part I header, every later line then followed A,
+    // and Part II stayed empty for good — with all four invariants green,
+    // because counts and anchors were fine (seen live on a real record,
+    // 2026-09-07). Bounded to the TOC region so a quoted header in a body
+    // cannot match.
+    const heads = scanAppendices(before);
+    const limit = heads.length ? heads[0].line : lines.length;
+    const partII = lines.findIndex((l, i) => i < limit && PART_II_RE.test(l));
+    if (partII !== -1) {
+      insertAt = partII + 1;
+    } else {
+      // No Part II header either. Land the first line just below the
+      // "Table of Contents" heading rather than refusing — refusing is what
+      // forced the hand-splice on entry A — and say so, because this is a
+      // guess about layout that the invariants cannot check.
+      const tocHead = lines.findIndex((l) => /^#+\s*Table of Contents/i.test(l));
+      if (tocHead === -1) return { ok: false, code: 1, msg: 'no appendix TOC lines and no "Table of Contents" heading — refusing to guess placement' };
+      let k = tocHead + 1;
+      while (k < lines.length && lines[k].trim() === '') k++;
+      insertAt = k;
+      warning = 'no appendix TOC lines and no "**Part II — Appendices**" header found: the TOC line was placed just below the "Table of Contents" heading — confirm by eye that it landed where this record wants it';
+    }
   }
 
   // Carry the file's own line ending onto the inserted line: `lines` were split
@@ -288,7 +314,7 @@ function appendEntry(opts) {
   // anchor, exit 0 — for three records whose real append then refused. A dry
   // run that disagrees with the real run is worse than no dry run: it is a
   // green light for something that cannot happen.
-  if (dryRun) return { ok: true, letter, heading, tocLine, slug, dryRun: true };
+  if (dryRun) return { ok: true, letter, heading, tocLine, slug, warning, dryRun: true };
 
   const lockPath = recordPath + '.lock';
   let lockFd;
@@ -340,7 +366,7 @@ function appendEntry(opts) {
     try { fs.closeSync(lockFd); } catch (_) {}
     try { fs.unlinkSync(lockPath); } catch (_) {}
   }
-  return { ok: true, letter, heading, tocLine, slug };
+  return { ok: true, letter, heading, tocLine, slug, warning };
 }
 
 // ---- invariants ------------------------------------------------------------
@@ -517,6 +543,10 @@ function canary() {
   fs.writeFileSync(pBoot, '# Record\n\n# Table of Contents\n\n<!-- appendix links land here -->\n\n---\n', 'utf8');
   const rBoot = appendEntry({ recordPath: pBoot, title: 'first ever', date: '2026-01-01, ~00:00 CST', body: 'hello\n' });
   t('a bootstrap skeleton accepts its first entry', rBoot.ok === true && rBoot.letter === 'A');
+  //     ...and, having no Part II header to aim at, says it GUESSED (test 25
+  //     covers the two-part layout that has one)
+  t('a skeleton with no Part II header lands under the TOC heading and WARNS',
+    rBoot.warning != null && fs.readFileSync(pBoot, 'utf8').split('\n').findIndex((l) => l.startsWith('- [A ')) === 4);
 
   // 17. a title carrying a newline would split the heading and the TOC line
   const pNl = mkEol('\n', [{ l: 'A', t: 'first', d: '-' }]);
@@ -597,6 +627,44 @@ function canary() {
   const freeLock = appendEntry({ recordPath: pLock, title: 'x', date: '2026-01-02, ~00:00 CST', body: 'b\n' });
   t('with the lock gone the append proceeds', freeLock.ok === true);
   t('the lock file is not left behind', !fs.existsSync(pLock + '.lock'));
+
+  // 25. ZERO existing appendix lines in a TWO-PART TOC (templates.md §2:
+  //     `**Part I — Original record**` with phase links, then `**Part II —
+  //     Appendices (chronological)**`). The old fallback landed Appendix A just
+  //     below the TOC heading — ABOVE Part I — and every later line then
+  //     followed A, leaving Part II permanently empty. All four invariants
+  //     stayed green because counts and anchors were fine (seen live on a real
+  //     record, 2026-09-07). The first line must land directly under Part II.
+  const twoPart = (dash) =>
+    '# Record\n\n# Table of Contents\n\n' +
+    '**Part I — Original record (2026-01-01)**\n' +
+    '- [Phase 0 — scoping](#phase-0--scoping) (~01-01)\n\n' +
+    `**Part II ${dash} Appendices (chronological)**\n\n---\n\n` +
+    '## Phase 0 — scoping\n\nbody\n';
+  const pTwo = path.join(dir, 'two-part.md');
+  fs.writeFileSync(pTwo, twoPart('—'), 'utf8');
+  const rTwo = appendEntry({ recordPath: pTwo, title: 'first', date: '2026-01-02, ~00:00 CST', body: 'a\n' });
+  const aTwo = fs.readFileSync(pTwo, 'utf8').split('\n');
+  const iPartI = aTwo.findIndex((l) => l.startsWith('**Part I '));
+  const iPhase = aTwo.findIndex((l) => l.startsWith('- [Phase 0 '));
+  const iPartII = aTwo.findIndex((l) => l.startsWith('**Part II '));
+  const iA = aTwo.findIndex((l) => l.startsWith('- [A '));
+  t('first appendix line lands DIRECTLY under the Part II header', rTwo.ok === true && iA === iPartII + 1);
+  t('Part I header and its phase line stay adjacent above Part II', iPartI === 4 && iPhase === iPartI + 1 && iPartII > iPhase);
+  t('no warning when the Part II header is found', rTwo.warning == null);
+  appendEntry({ recordPath: pTwo, title: 'second', date: '2026-01-03, ~00:00 CST', body: 'b\n' });
+  const aTwo2 = fs.readFileSync(pTwo, 'utf8').split('\n');
+  t('the second appendix line follows the first, still under Part II',
+    aTwo2.findIndex((l) => l.startsWith('- [B ')) === aTwo2.findIndex((l) => l.startsWith('- [A ')) + 1);
+  // the header is matched dash-agnostically, like the headings are
+  for (const d of ['-', '–']) {
+    const pD = path.join(dir, 'two-part-' + d.charCodeAt(0) + '.md');
+    fs.writeFileSync(pD, twoPart(d), 'utf8');
+    appendEntry({ recordPath: pD, title: 'first', date: '2026-01-02, ~00:00 CST', body: 'a\n' });
+    const aD = fs.readFileSync(pD, 'utf8').split('\n');
+    t(`Part II header with dash U+${d.charCodeAt(0).toString(16).toUpperCase().padStart(4, '0')} is found`,
+      aD.findIndex((l) => l.startsWith('- [A ')) === aD.findIndex((l) => l.startsWith('**Part II ')) + 1);
+  }
 
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch (_) {}
   console.log(fail === 0 ? `CANARY PASS ${pass}/${pass + fail}` : `CANARY FAIL ${pass}/${pass + fail}`);
@@ -773,6 +841,7 @@ function main() {
   console.log('  toc    : ' + res.tocLine);
   console.log('  anchor : #' + res.slug);
   if (!res.dryRun) console.log('  invariants: append-only, no duplicate letters, letters ordered, TOC/heading counts match');
+  if (res.warning) console.error('  WARNING: ' + res.warning);
 }
 
 if (require.main === module) main();

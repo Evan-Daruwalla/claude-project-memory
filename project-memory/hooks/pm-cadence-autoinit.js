@@ -25,8 +25,8 @@
  *     project undercounts. Observed live: a container dir reached _count 72.
  *   - the project's own .claude/settings.json already registers a
  *     UserPromptSubmit hook (assume it runs its own cadence mechanism —
- *     this lets a project with a pre-existing cadence hook avoid a
- *     double-fire, without hardcoding any project by name)
+ *     this is how a project with its own cadence script avoids a
+ *     double-fire, without hardcoding that project by name)
  *
  * Output: structured JSON on stdout per the PreToolUse hook contract, adding
  * additionalContext when (and only when) a config was just auto-created.
@@ -37,12 +37,20 @@
 const fs = require("fs");
 const path = require("path");
 
+// must match pm-cadence.js's DEFAULTS. Since 2026-09-01 the record_entry /
+// handoff / bins numbers are a DEBOUNCE (min prompts between repeat
+// reminders), not a trigger — those subparts fire on file mtimes instead.
 const DEFAULTS = {
   record_entry: 3,
-  handoff: 0,
+  handoff: 15,
   prd_next_task: 0,
-  bins: 0,
+  bins: 3,
+  bins_max_age_days: 21,
+  drift_check: 15,
+  drift_check_days: 14,
+  _floor: 0,
   _count: 0,
+  _last_fired: {},
   _last_reminder_iso: null,
   _auto_created: true,
 };
@@ -119,12 +127,12 @@ function main() {
   const cwd = (j && j.cwd) || process.cwd();
   const cfgPath = path.join(cwd, ".claude", "pm-cadence.json");
 
-  // Checking cwd ONLY disagrees with pm-cadence.js, which resolves the config
+  // Checking cwd ONLY disagreed with pm-cadence.js, which resolves the config
   // by walking up to the nearest ancestor. Invoking the skill from a
   // marker-bearing SUBDIRECTORY of an already-configured project therefore
   // created a second config, which the counter then preferred — the parent's
-  // cadence silently froze and a fresh one started at 0. Observed live: a root
-  // config at _count 155 beside a subproject config at _count 0.
+  // cadence silently froze and a fresh one started at 0. Observed live in
+  // a real project (root _count:155 beside <subdir>/backend _count:0).
   // A reminder that stops firing is silent by construction, so both hooks must
   // answer "which dir is the project?" the same way.
   for (let dir = cwd; ; ) {
@@ -161,8 +169,12 @@ function main() {
 
   emit(
     "[PM-CADENCE] No cadence config existed for this project — auto-created " +
-      "defaults at .claude/pm-cadence.json (record_entry: every 3 prompts; " +
-      "handoff/prd_next_task/bins: event-driven, not prompt-counted). Before " +
+      "defaults at .claude/pm-cadence.json. All reminders are change-driven: " +
+      "record_entry when files are newer than the record (once per 3 prompts); " +
+      "bins when code is newer than the codebase-memory bins OR any single bin " +
+      "is over 21 days old (once per 3); handoff on a long 15-prompt debounce " +
+      "since mid-session drift is normal; drift_check when HANDOFF.md has been " +
+      "untouched 14+ days AND the project moved since; prd_next_task off. Before " +
       "proceeding with the user's project-memory request, ask if they want " +
       "different numbers for any subpart, and update the file if so."
   );

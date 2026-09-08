@@ -1,37 +1,36 @@
 ---
 name: project-memory
 description: >-
-  A project memory + execution-doc system: HANDOFF.md (only live snapshot) +
-  append-only record + standing PRD_ROADMAP.md + codebase-memory bins. Six
-  workflows: BOOTSTRAP, RECORD ENTRY, HANDOFF sync, PRD write / EXECUTE next
-  task, BINS, DRIFT-CHECK. Use when: "/project-memory", "handoff", "update the
-  docs/record", "log this", "record this", "bootstrap the memory system",
-  "next task", "continue the roadmap", "drift check", "is HANDOFF still true"
-  — or when wrapping up a session, in a project lacking HANDOFF.md, or given
-  no direction where a PRD_ROADMAP.md exists. Read templates.md before
-  creating any doc.
+  A project memory + execution-doc system: HANDOFF.md
+  (only live snapshot) + append-only record + standing PRD_ROADMAP.md +
+  codebase-memory bins. Six workflows: BOOTSTRAP, RECORD ENTRY, HANDOFF sync,
+  PRD write / EXECUTE next task, BINS, DRIFT-CHECK. Use when:
+  "/project-memory", "handoff", "update the docs/record", "log this", "record
+  this", "bootstrap the memory system", "next task", "continue the roadmap",
+  "drift check", "is HANDOFF still true" — or when wrapping up a session, in a
+  project lacking HANDOFF.md, or given no direction where a PRD_ROADMAP.md
+  exists. Read templates.md before creating any doc.
 ---
 
 # project-memory — the doc/memory system
 
-One system for keeping a project's memory correct across sessions and models.
-Copy the STRUCTURE exactly (templates.md is the skeleton); the content always
-comes from THIS project. For files that already exist, match their established
-convention — some records use `## YYYY-MM-DD — <title>` dated sections, others
-use `# Appendix <X>` headings; never reformat an existing doc to the template.
+One system, proven on a real long-running project. Copy the STRUCTURE exactly
+(templates.md is character-exact); the content always comes from THIS project.
+For files that already exist, match their established convention — e.g.
+some projects' records use `## YYYY-MM-DD — title` entries instead of
+`# Appendix X` headings; never reformat an existing doc to the template.
 
 **The doc set** (project root unless noted):
 
 | File | Role | Mutability |
 |---|---|---|
 | `HANDOFF.md` | The only live snapshot; a fresh session reads it FIRST | Rewritten freely; keep it a snapshot, move history to the record |
-| `docs/<record>.md` (a chronological build log, e.g. `Project Record — Full Chronological History.md` or `record_<date>.md`) | Append-only chronological build log — the ground truth; when anything disagrees with it, the record wins. Point-in-time snapshots live INSIDE it as dated entries | APPEND-ONLY; front-matter TOC gets one new line per entry; prior entries never edited |
+| `docs/Project Record — Full Chronological History.md` (or `docs/record_<date>.md`) | Append-only chronological build log — the ground truth; when anything disagrees with it, the record wins. Point-in-time snapshots live INSIDE it as dated entries | APPEND-ONLY; front-matter TOC gets one new line per entry; prior entries never edited |
 | `PRD_ROADMAP.md` | Standing plan a model executes task-by-task | Grows by APPEND; never wholesale-deleted/retyped. Removed steps are struck through in place (kept + dated); a new direction is a dated FORK marked as the current plan (see §4) |
 | `.claude/codebase-memory/` | Binned technical memory (see §5) | Superseded in place, same session as the code change |
 
-Explicitly OUTSIDE this system: project-specific operational artifacts (daily
-reports, run logs, generated dashboards) that have their own rules — never
-fold them in.
+Explicitly OUTSIDE this system: project-specific artifacts such as a
+`daily_report.md` / `rebalance_log.md` (they have their own rules) — never fold them in.
 
 **Cross-session rule — where "latest" comes from.** Other sessions write to
 these files between your reads. Anything about the record's CURRENT position —
@@ -54,17 +53,64 @@ remembering to check:
   `.claude/pm-cadence.json` doesn't exist yet AND the directory carries a
   PROJECT MARKER (`.git`, `HANDOFF.md`, `PRD_ROADMAP.md`, `CLAUDE.md`, or a
   language manifest) AND the project has no `UserPromptSubmit` hook of its own
-  already (that last check is how a project already running its own cadence
-  mechanism avoids getting a second one — no hardcoding, just "does this
-  project already have a cadence hook"), it auto-creates the config with
+  already (that last check is how a project that keeps its own
+  cadence script avoids getting one — no hardcoding, just "does this
+  project already have a cadence mechanism"), it auto-creates the config with
   defaults and injects a context note. **The marker check exists because
   without it the hook seeds a counter in whatever directory the session was
   opened in — including a parent folder that merely CONTAINS projects, which
   then accumulates prompts belonging to no project while every real project
   undercounts. Observed live: a container dir reached `_count` 72 beside a real
   project sitting at 13.** A marker-less directory gets no config and says so.
-- **`hooks/pm-cadence.js`** (`UserPromptSubmit`) then counts prompts per
-  project against that config and injects a reminder every Nth subpart-cadence.
+- **`hooks/pm-cadence.js`** (`UserPromptSubmit`) then decides per prompt which
+  subparts are DUE. Since 2026-09-01 record_entry/handoff/bins are
+  **change-driven**: it compares the newest project file's mtime against the doc
+  that should describe it (record file / `HANDOFF.md` / newest bin) and stays
+  SILENT when nothing is newer — a chat-only session now costs zero reminders
+  and zero skill loads. Their config number became a **debounce** (at most one
+  reminder per N prompts), not a trigger; `_floor` (default 0 = off) forces a
+  periodic reminder even with no file change. `prd_next_task` stays a pure
+  counter. mtime is a proxy: a formatter or `git checkout` can false-positive,
+  costing one wasted reminder. Measured 2026-09-01: 143–155 ms on a real project
+  (4,939 scannable files), 1.96 s worst case on a synthetic 15k-file tree where
+  nothing is stale and the early exit never fires — both inside the 5 s hook
+  timeout. Past `MAX_ENTRIES` (25000) or `MAX_DEPTH` (12) the walk can't see a
+  change; it then degrades to the old prompt counter rather than going silent,
+  and says so instead of claiming a change it never observed.
+  The reminder also carries **line ranges**, not a skill name: obeying it used
+  to mean invoking `/project-memory` and loading all ~29 KB (~7k tokens) to do
+  a job one section answers. It now emits e.g. `SKILL.md:140-182` plus the
+  rules block, parsed from this file at fire time so the numbers cannot rot
+  when it is edited (a hardcoded range would silently cite the wrong text).
+  §2 is 2.5 KB against the file's 28.9 KB — 11.5x less to read.
+  **All four subparts now run** (2026-09-02). They were all off but
+  `record_entry`, which is why one project's `conventions.md` went stale
+  unnoticed; that default was only rational while enabling a subpart meant
+  nagging every N prompts regardless of need. Three fixes made it safe:
+  `bins` finds `codebase-memory/` by bounded search (root, then one level down
+  — one real project keeps its config at the root and its bins one level down,
+  which a fixed path missed entirely); `bins_max_age_days` (21) flags an
+  individual rotting bin even when a sibling is fresh, since taking only the
+  NEWEST bin meant touching any one file silenced the whole subpart; and an
+  ABSENT target (no `HANDOFF.md`, no bins dir) now means "not in use here"
+  rather than mtime 0 = infinitely stale, which would have nagged forever with
+  no action able to stop it. `handoff` runs on a long 15-prompt debounce, not
+  3: `HANDOFF.md` is the end-of-session snapshot, so mid-session drift is
+  expected. A bin reviewed and still accurate is kept fresh by touching it.
+  **`drift_check` (§6) is the fifth subpart** (2026-09-02) and §3's stricter
+  sibling: `handoff` says "source moved, sync the snapshot"; `drift_check` says
+  "the snapshot has ALSO sat untouched for `drift_check_days` (14) while the
+  project moved, so verify its CLAIMS, not just its state". It targets
+  `HANDOFF.md` itself rather than storing "when I last asked" in the config —
+  a hook cannot check whether the model complied, so a written-back clock would
+  silence itself for two weeks on nothing; keyed to the file, ignoring the
+  reminder changes nothing and it keeps firing until HANDOFF is really touched.
+  A dormant project never fires it: an old HANDOFF alone is not drift.
+  **All three targets are found by root-then-one-level search** — one real project
+  keeps its record at the root but `HANDOFF.md` and its bins inside
+  a subdirectory, so a root-only lookup found one of three and silently
+  missed the rest. Root wins when present; otherwise the NEWEST match one level
+  down, which picks the live tree over a retired sibling.
 
 Neither hook can invoke this skill or ask the user anything — that's the real
 ceiling (no hook can run interactively). What they DO make deterministic:
@@ -96,8 +142,8 @@ ever reads this section. The model's only remaining job:
    beyond the standard doc set; fold the applicable rows into the HANDOFF,
    bins, and docs plan. Inapplicable rows are already stubbed N/A there.
 2. **Create `HANDOFF.md`** from templates.md §1: Goal (why the project exists,
-   in the owner's terms), dated Current state, key architecture/data facts,
-   hard constraints, Documentation section, next actions.
+   in the owner's terms), dated Current state, key architecture/data facts, hard
+   constraints, Documentation section, next actions.
 3. **Create the record** from templates.md §2: grounding preamble (list the
    real sources entries are grounded in), "How this document is organized",
    TOC. Seed from git history and existing docs — real events with absolute
@@ -106,9 +152,11 @@ ever reads this section. The model's only remaining job:
    four independently-firing subparts; ask the user how often each should run
    and write the answers into the project `CLAUDE.md` (default in parens if
    they say "whatever"):
-   - **Record entry** (§2) — every N prompts of real work (default: 3).
-   - **Handoff** (§3) — at session end, or every N prompts (default: session
-     end only).
+   - **Record entry** (§2) — fires when project files are newer than the
+     record; N is the debounce, i.e. at most one reminder per N prompts
+     (default: 3).
+   - **Handoff** (§3) — at session end, or whenever files are newer than
+     `HANDOFF.md` with N as the debounce (default: session end only, i.e. 0).
    - **PRD next-task** (§4) — on request, or as the default idle action
      (default: on request).
    - **Codebase-memory bins** (§5) — same session as any code change that
@@ -117,8 +165,8 @@ ever reads this section. The model's only remaining job:
    slips, catch up next prompt and note the miss in the record. If the user
    wants a hard guarantee, that's a `settings.json` hook, out of this skill's
    scope.
-5. **Memory files**: if the harness has a persistent memory store, record the
-   doc layout + hard constraints there and index them.
+5. **Auto-memory files**: record the doc layout + hard constraints in the
+   Claude auto-memory directory, indexed in MEMORY.md.
 6. **Verify**: re-read HANDOFF.md as a fresh session would — does it alone say
    what the project is, where it stands, what to do next? Fix now if not.
 7. Report what was seeded from real history vs. left empty.
@@ -148,10 +196,10 @@ ever reads this section. The model's only remaining job:
    letter was already here and was followed — that is the point: this is a gate,
    and gates get scripts.
 
-   A dated-section record (`## YYYY-MM-DD — <title>` sections in `docs/record_<date>.md`)
+   The dated-section convention (`## YYYY-MM-DD — <title>` sections in `docs/record_<date>.md`)
    is a different convention — the script refuses it rather than guessing; hand-
    append there, matching the file's existing shape.
-2. Entry content: absolute date + approx time ("2026-01-15 ~16:40"); WHAT
+2. Entry content: absolute date + approx time ("2026-07-08 ~16:40"); WHAT
    changed · WHY (problem, tradeoff) · HOW (approach, especially non-obvious
    or after an abandoned attempt); any bug as symptom → root cause → fix;
    honest open items labeled as such. Failures and slips stated, not smoothed.
@@ -159,9 +207,10 @@ ever reads this section. The model's only remaining job:
    architecture change), the entry carries a full point-in-time snapshot
    section (tables preferred) — snapshots live in the record, nowhere else.
 3. APPEND ONLY — corrections are NEW entries referencing the old one.
-4. Regenerate the HTML twin where one exists, by the project's render script
-   only — never hand-edit generated HTML. If the renderer reports a broken
-   internal-link count, it must be 0; that verifies your TOC anchors.
+4. Regenerate the HTML twin where one exists, by script only (e.g.
+   `.venv\Scripts\python.exe -m scripts.render_record_html`, or
+   `python -m scripts.render_record_html`). The renderer's `broken:` count
+   verifies your TOC anchors — it must print `broken: 0`.
 5. Don't update HANDOFF.md from this workflow — that's §3's job (offer it if
    the entry reveals it's stale).
 
@@ -176,7 +225,7 @@ ever reads this section. The model's only remaining job:
    displaced history into the record, not the trash.
 4. **HTML twins** by script, per §2.4.
 5. **Memory files**: if a durable fact changed (constraint, convention,
-   roadmap shift), update the persistent memory store + its index.
+   roadmap shift), update the auto-memory file + its MEMORY.md index line.
 6. **Handoff prompt**: end with a fenced, paste-ready prompt for the next
    session — read order (HANDOFF.md → record front-matter → PRD), 1-paragraph
    current state, hard constraints, concrete next actions in priority order.
@@ -184,24 +233,24 @@ ever reads this section. The model's only remaining job:
 ## 4. PRD — write one, or execute its next task
 
 **Before drafting — grill the open decisions.** If the plan has interdependent
-or unresolved design choices, interview the user ONE question at a time, each
-with your recommended answer, walking down the decision tree until every branch
-is resolved. Where a question is already answered by the codebase, resolve it
-from the code instead of asking. Only draft once the tree is settled — a PRD
-written over unresolved forks bakes in guesses a cheaper model can't unwind later.
+or unresolved design choices, interview the owner ONE question at a time, each with
+your recommended answer, walking down the decision tree until every branch is
+resolved. Where a question is already answered by the codebase, resolve it from
+the code instead of asking. Only draft once the tree is settled — a PRD written
+over unresolved forks bakes in guesses a cheaper model can't unwind later.
 
 **Writing/updating a PRD**: use templates.md §3 (the 7 numbered sections).
 Every PRD opens with the one-paragraph **GOAL** block at the very top of the
 file (see §3) — write it FIRST; it is the sentence that keeps every later
 session squarely on track.
 Tasks must be small enough for a cheaper model to finish alone, each naming
-its files and its done-check. Scope decisions get dated ("decided
+its files and its done-check. Scope decisions get dated ("decided by the owner
 YYYY-MM-DD"). Anything needing the owner's accounts/keys/purchases is marked
-BLOCKED (needs the owner), never silently assumed.
+BLOCKED-ON-OWNER, never silently assumed.
 
 **PRD mutability — the roadmap keeps its own planning history; NEVER
 wholesale-delete or retype it.** The plan's evolution is itself part of the
-record:
+record ("the process is the product"):
 - **Add** by APPENDING new tasks/milestones. Don't rewrite the whole plan to
   slot something in.
 - **Remove** a step by STRIKING IT THROUGH in place with a dated reason —
@@ -221,22 +270,25 @@ record:
 **Executing the next task** (default action in a project with a PRD):
 1. Load context in order: project `CLAUDE.md` → `HANDOFF.md` →
    `PRD_ROADMAP.md` → record front-matter. The HANDOFF workstream table says
-   what's already done — trust it over guessing from code.
-2. Pick the first not-done task in milestone order (or the task the owner
-   named). BLOCKED or gated tasks are REPORTED, not worked around — move to
+   what's already done — trust it over guessing from code. (If cwd is
+   the project root, the PRD may sit one level down at `<subdir>/PRD_ROADMAP.md`.)
+2. Pick the first not-done task in milestone order (or the task the owner named).
+   BLOCKED-ON-OWNER or gated tasks are REPORTED, not worked around — move to
    the next independent task only if the PRD allows it, else stop and say
-   exactly what's needed.
+   exactly what you need from the owner.
 3. Restate before coding (2–3 lines): the task, files it touches, its
    done-check. If it looks wrong-sized, ambiguous, or its premise no longer
    matches the code — STOP and report with a recommendation.
 4. Implement surgically: every changed line traces to the task; read files
    fully before editing; re-read the PRD's HANDOFF NOTES gotchas every time.
 5. Verify: the project CLAUDE.md's definition of done PLUS the task's own
-   done-check. Run the real commands, paste real output. NEVER "should pass".
+   done-check. Run the real commands, paste real output (e.g. frozen
+   tests must print d=±0.0000pp; or backend pytest + frontend
+   lint + build + browser-verify UI). NEVER "should pass".
 6. Document: record entry per §2; HANDOFF workstream table if a milestone's
    status changed.
-7. Commit if the PRD authorizes per-task commits. NEVER push without the
-   owner's instruction.
+7. Commit if the PRD authorizes per-task commits (both current PRDs do).
+   NEVER push without the owner's instruction.
 8. Report outcome-first: what shipped, verification summary, record location,
    then "next task: <id> — <one line>" so the owner can say "go".
 One task per invocation. A blocked task honestly reported beats a fudged one.
@@ -265,8 +317,13 @@ re-reading the codebase — and without loading everything.
   commands), `disclosure.md` (**what may leave this project** — who the
   non-code stakeholders are, what a case study / screenshot / demo / public
   README may and may not show, and any standing external constraint on
-  outward-facing work). *Boundary vs `security.md`: security.md governs
-  the CODEBASE (secrets, auth, input handling) and its failure is a breach;
+  outward-facing work).
+  (Live case: a project holding MINORS' data, which constrains what any
+  screenshot, demo, or portfolio case study may show long after the code is
+  frozen — a rule `security.md` does not cover and the record does not
+  surface at the moment the case study gets written.) *Boundary vs
+  `security.md`: security.md governs the CODEBASE (secrets, auth, input
+  handling) and its failure is a breach;
   disclosure.md governs ARTIFACTS DERIVED from the project that go outside it,
   and its failure is publishing something that should never have left.*
   **Bootstrap creates the FULL set (core + standards), not opt-in**:
@@ -275,8 +332,8 @@ re-reading the codebase — and without loading everything.
   empty, no perf work yet (2026-…)`), NEVER omitted. Why: every standard gets
   one obvious home, so facts stop scattering into other bins, and the stub
   records that the standard was considered. Replace the stub with real facts
-  the moment they exist. (Preference: an empty bin beats a fact scattered
-  across three other bins.)
+  the moment they exist. (The owner's stated preference: an empty bin beats a
+  fact scattered across three other bins.)
 - **New bins on demand — specific, never a catch-all.** The core + standards
   set is the baseline, not a ceiling. When a durable fact fits none of the
   existing bins, CREATE A NEW bin named for its specific domain (e.g.
@@ -303,7 +360,7 @@ re-reading the codebase — and without loading everything.
   constraint that was correctly recorded still gets violated at publish time.
 - **Write protocol** (staleness is the failure mode): any change that alters a
   fact updates that bin the SAME session. Supersede in place ("(supersedes
-  2026-01-10 entry: X)" when history matters). Cap ~150 lines/bin — compress
+  2026-06-30 entry: X)" when history matters). Cap ~150 lines/bin — compress
   oldest, least load-bearing first. Never delete a security/invariant entry
   without telling the user.
 - **Bootstrap mode**: scan entry points/config/docs/ADRs/tests, populate
@@ -393,7 +450,8 @@ with a dozen tool calls before it can start.
 The verification arm of the system: HANDOFF.md is the only live snapshot, and a
 cheap model's worst failure mode is confidently acting on a stale one. This
 workflow re-tests what HANDOFF CLAIMS against reality and reports the drift.
-Scope is strictly HANDOFF.md's claims — not the skill docs, not a code audit.
+Scope is strictly HANDOFF.md's claims — NOT the skill docs, NOT a code audit
+(that's /audit's job).
 
 1. **Extract claims.** Read HANDOFF.md and list every INDEPENDENTLY VERIFIABLE
    claim: test suites and their pinned results, services/ports said to be
@@ -402,11 +460,12 @@ Scope is strictly HANDOFF.md's claims — not the skill docs, not a code audit.
 2. **Classify each claim:**
    - CHEAP — verifiable now with a read-only or fast command → run it.
    - EXPENSIVE/RISKY — needs a long run, a protected time window, or touches
-     live state → do NOT run; report as UNVERIFIED-TODAY with the exact command
-     a future session should use, and why it was skipped.
+     live state (anything that trades, writes a shared DB) → do NOT run;
+     report as UNVERIFIED-TODAY with the exact command a future session should
+     use, and why it was skipped.
 3. **Run the cheap checks for real.** Paste real output. Respect the project's
-   hard rules while checking (read-only access to shared state; protected time
-   windows; never run anything with side effects on production).
+   hard rules while checking (e.g. read-only DB access, stay out of a
+   5:00–6:30pm window; never run anything that trades).
 4. **Report a drift table:** claim → observed reality → verdict per row:
    **MATCH** / **DRIFT** (with the delta) / **UNVERIFIED-TODAY** (with reason).
    Outcome-first: lead with "no drift" or the count of drifted rows.
@@ -418,7 +477,7 @@ Scope is strictly HANDOFF.md's claims — not the skill docs, not a code audit.
 
 ## Rules (all workflows)
 
-- Absolute dates everywhere ("2026-01-15", never "today"/"recently").
+- Absolute dates everywhere ("2026-07-08", never "today"/"recently").
 - NEVER invent history, data, or numbers. Unsure whether something happened →
   leave it out or mark it explicitly uncertain.
 - Append-only means append-only. The record's front-matter TOC/digest may gain
