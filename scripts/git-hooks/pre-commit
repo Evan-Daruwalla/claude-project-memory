@@ -1,0 +1,79 @@
+#!/bin/sh
+# commit-gate — native git pre-commit hook, VERSION CONTROLLED.
+#
+# Lives at scripts/git-hooks/pre-commit and is selected by
+# `git config core.hooksPath scripts/git-hooks`, matching every other repo in
+# this family. It used to live in .git/hooks, which is not version controlled:
+# the protection existed on one machine and vanished on clone. A gate nobody
+# receives is not a gate.
+#
+# INSTALL IN A FRESH CLONE:
+#   git config core.hooksPath scripts/git-hooks
+#
+# Two independent gates run. Each fails CLOSED on a finding and NOISILY
+# open if it cannot run — a gate that skips silently is a dead gate.
+
+REPO=$(git rev-parse --show-toplevel)
+
+# ── 1. Secrets ───────────────────────────────────────────────────────────────
+# Resolved from the installed skills dir so this hook and the PreToolUse hook
+# read ONE scanner rather than two copies kept in sync by hand.
+SCANNER="${HOME}/.claude/skills/history-leak-scan/pm-secretscan.js"
+
+# Without this guard a missing scanner makes node exit 1, which the branch below
+# reports as "a secret was detected" — blocking the commit with a false reason.
+if [ ! -f "$SCANNER" ]; then
+  echo "commit-gate WARNING: scanner not found at $SCANNER — secret gate SKIPPED (fail-open)." >&2
+  echo "The commit proceeds UNSCANNED for secrets." >&2
+else
+  node "$SCANNER" --staged "$REPO"
+  status=$?
+  if [ "$status" -eq 1 ]; then
+    echo "" >&2
+    echo "commit-gate: a secret was detected in the STAGED diff — commit BLOCKED." >&2
+    echo "Remove it from the diff; if it is a live credential, rotate it and update" >&2
+    echo "your secrets inventory before retrying." >&2
+    echo "(To override in a true emergency: git commit --no-verify.)" >&2
+    exit 1
+  elif [ "$status" -ne 0 ]; then
+    echo "commit-gate WARNING: scanner error (exit $status) — secret gate SKIPPED (fail-open)." >&2
+    echo "The commit proceeds UNSCANNED for secrets. Check node + $SCANNER" >&2
+  fi
+fi
+
+# ── 2. Private identifiers ───────────────────────────────────────────────────
+# Blocks a private name (a workspace project, an author, a local path) from
+# reaching this PUBLIC repo.
+#
+# The guard's PATH is read from local git config, never hardcoded here: it lives
+# outside this repo, and writing its location into a public file would publish
+# the very layout it protects. It is also inherently machine-local — a clone on
+# someone else's computer has no private workspace to leak, so its absence there
+# is correct, not a misconfiguration.
+#
+#   git config leakguard.path /abs/path/to/leak-guard.js
+#
+LEAKGUARD=$(git config leakguard.path || true)
+if [ -z "$LEAKGUARD" ]; then
+  echo "commit-gate: leakguard.path not configured — private-identifier gate not applicable here." >&2
+elif [ ! -f "$LEAKGUARD" ]; then
+  echo "commit-gate WARNING: leakguard.path is set to '$LEAKGUARD' but no file is there —" >&2
+  echo "private-identifier gate SKIPPED (fail-open). Fix the path or unset the config." >&2
+else
+  node "$LEAKGUARD" --staged "$REPO"
+  lstatus=$?
+  if [ "$lstatus" -eq 1 ]; then
+    echo "" >&2
+    echo "commit-gate: a PRIVATE identifier is in the STAGED diff — commit BLOCKED." >&2
+    echo "This is a PUBLIC repo. Genericize the lines listed above, restage, retry." >&2
+    echo "If the name is genuinely safe in public, add it to EXCEPTIONS in the guard" >&2
+    echo "with a reason — do not weaken the pattern." >&2
+    echo "(To override in a true emergency: git commit --no-verify.)" >&2
+    exit 1
+  elif [ "$lstatus" -ne 0 ]; then
+    echo "commit-gate WARNING: leak-guard error (exit $lstatus) — private-identifier gate SKIPPED (fail-open)." >&2
+    echo "The commit proceeds UNSCANNED for private names." >&2
+  fi
+fi
+
+exit 0
