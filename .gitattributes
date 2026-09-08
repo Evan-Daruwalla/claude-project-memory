@@ -1,0 +1,17 @@
+# Shell scripts and git hooks must keep LF endings.
+#
+# core.autocrlf is true on this machine and this repo had no .gitattributes, so
+# a fresh clone rewrote every tracked shell script to CRLF - shebang included.
+# It arrives as `#!/bin/sh\r`, a POSIX kernel execs the literal interpreter
+# "/bin/sh\r", and the result is "bad interpreter: No such file or directory".
+# For a pre-commit hook that means the clone silently has NO commit gate, with
+# no error that names the cause.
+#
+# Measured 2026-08-20 on a real clone: the CRLF form still runs correctly under
+# Git for Windows (hook exit 0, and it DENIED a staged AKIA literal at exit 1),
+# so this protects Linux/macOS clones and CI rather than this machine.
+#
+# Scoped to shell scripts and hooks on purpose. A blanket `* text=auto` would
+# restage line endings across the whole tree for no benefit here.
+*.sh        text eol=lf
+pre-commit  text eol=lf
