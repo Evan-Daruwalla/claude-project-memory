@@ -66,15 +66,24 @@ const LABELS = {
 // invoking /project-memory, which loads the whole ~28 KB skill (~7k tokens) to
 // do a job one section answers (§2 RECORD ENTRY is 43 lines, under 1k). The
 // reminder now carries LINE NUMBERS so the model can read just that part.
+// Each subpart names its SKILL as well as its section. RECORD ENTRY, HANDOFF
+// and DRIFT-CHECK moved to /docs-sync on 2026-09-09; BOOTSTRAP, PRD and BINS
+// stayed here. A reminder that cites the wrong skill sends the reader to a
+// section that no longer exists, which is worse than citing no section at all.
 const SECTIONS = {
-  record_entry: "2",
-  handoff: "3",
-  prd_next_task: "4",
-  bins: "5",
-  drift_check: "6",
+  record_entry:  { skill: "docs-sync",      sec: "2" },
+  handoff:       { skill: "docs-sync",      sec: "3" },
+  prd_next_task: { skill: "project-memory", sec: "4" },
+  bins:          { skill: "project-memory", sec: "5" },
+  drift_check:   { skill: "docs-sync",      sec: "4" },
 };
 
-const SKILL_PATH = path.join(__dirname, "..", "SKILL.md");
+// project-memory keeps its own relative path (this hook lives inside it, and
+// the directory could be renamed); siblings resolve through the skills dir.
+const skillPathOf = (name) =>
+  name === "project-memory"
+    ? path.join(__dirname, "..", "SKILL.md")
+    : path.join(__dirname, "..", "..", name, "SKILL.md");
 
 // Subparts whose due-ness is decided by comparing mtimes. prd_next_task is
 // absent deliberately: a roadmap task becoming "next" is not a file event.
@@ -188,13 +197,16 @@ function sectionRanges(skillPath) {
   return out;
 }
 
-// "append a timestamped record entry (SKILL.md:140-182)" when the range is
-// known, else the original "(/project-memory §2)" pointer.
+// "append a timestamped record entry (docs-sync/SKILL.md:140-182)" when the
+// range is known, else the "(/docs-sync §2)" pointer. `ranges` is keyed by
+// SKILL NAME now, because two skills are in play.
 function describe(key, ranges) {
-  const sec = SECTIONS[key];
-  const r = ranges && sec ? ranges[sec] : null;
-  if (!r) return `${LABELS[key]} (/project-memory §${sec})`;
-  return `${LABELS[key]} (SKILL.md:${r[0]}-${r[1]})`;
+  const s = SECTIONS[key];
+  if (!s) return LABELS[key];
+  const byName = ranges && ranges[s.skill];
+  const r = byName ? byName[s.sec] : null;
+  if (!r) return `${LABELS[key]} (/${s.skill} §${s.sec})`;
+  return `${LABELS[key]} (${s.skill}/SKILL.md:${r[0]}-${r[1]})`;
 }
 
 function mtimeOf(p) {
@@ -469,8 +481,14 @@ function main() {
       : anyCapped
         ? "periodic check (project too large to scan fully — falling back to a prompt count)"
         : "periodic check (no file changes detected)";
-    // read SKILL.md only when something is actually due, not on every prompt
-    const ranges = sectionRanges(SKILL_PATH);
+    // read SKILL.md only when something is actually due, not on every prompt —
+    // and only the skills that are ACTUALLY due, so a bins-only reminder never
+    // opens docs-sync.
+    const ranges = {};
+    for (const k of due) {
+      const s = SECTIONS[k];
+      if (s && !(s.skill in ranges)) ranges[s.skill] = sectionRanges(skillPathOf(s.skill));
+    }
     const items = due.map((k) => {
       const base = describe(k, ranges);
       // name the worst offenders: "update the codebase-memory bins" alone does
@@ -481,15 +499,23 @@ function main() {
       const more = bins.stale.length > 3 ? `, +${bins.stale.length - 3} more` : "";
       return `${base} — stalest: ${worst}${more}`;
     }).join("; and ");
+    // `describe` already names each item's file and lines. This adds the
+    // rules-for-all-workflows pointer, once per SKILL actually due — both
+    // skills carry their own Rules block, and citing the wrong one sends the
+    // reader to rules that do not govern the job in hand.
     let how = "";
-    if (ranges) {
-      const rules = ranges.rules
-        ? ` Rules that apply to every workflow: SKILL.md:${ranges.rules[0]}-${ranges.rules[1]}.`
-        : "";
+    const rulesBits = [...new Set(due.map((k) => SECTIONS[k] && SECTIONS[k].skill))]
+      .filter(Boolean)
+      .map((n) => {
+        const r = ranges[n] && ranges[n].rules;
+        return r ? `${n}/SKILL.md:${r[0]}-${r[1]}` : null;
+      })
+      .filter(Boolean);
+    if (rulesBits.length) {
       how =
-        `${rules} Read those line ranges from ${SKILL_PATH} directly instead ` +
-        `of invoking /project-memory — the whole skill is ~7k tokens, one ` +
-        `section under 1k.`;
+        ` Rules that apply to every workflow: ${rulesBits.join(", ")}.` +
+        ` Read those line ranges directly instead of invoking the whole skill —` +
+        ` each skill is ~7k tokens, one section under 1k.`;
     }
     process.stdout.write(
       `[PM-CADENCE] Prompt #${count} — ${why}. Before continuing with ` +
@@ -764,9 +790,14 @@ function runCanary() {
     setM(rec, 1000); setM(src, 9000);
     r = fire(proj);
     check(/SKILL\.md:\d+-\d+/.test(r.stdout || ""), "reminder carries a concrete line range");
-    check(/instead of invoking \/project-memory/.test(r.stdout || ""), "reminder says not to load the whole skill");
-    check(/Rules that apply to every workflow: SKILL\.md:\d+-\d+/.test(r.stdout || ""),
+    check(/instead of invoking the whole skill/.test(r.stdout || ""), "reminder says not to load the whole skill");
+    check(/Rules that apply to every workflow: [a-z-]+\/SKILL\.md:\d+-\d+/.test(r.stdout || ""),
       "reminder also points at the rules-for-all-workflows block");
+    // The port's whole risk: a reminder that names the wrong skill sends the
+    // reader to a section that does not exist there. record_entry moved to
+    // docs-sync; bins did not.
+    check(/docs-sync\/SKILL\.md:\d+-\d+/.test(r.stdout || ""),
+      "a ported subpart cites docs-sync, not project-memory");
 
     // ranges are parsed live, so an edited SKILL.md yields different numbers —
     // this is what a hardcoded range would get wrong
@@ -781,8 +812,17 @@ function runCanary() {
     const rg2 = sectionRanges(fake);
     check(rg2["2"][0] === 6, `ranges shift when the file is edited, not hardcoded (got ${rg2["2"][0]}, want 6)`);
     check(sectionRanges(path.join(root, "nope.md")) === null, "unreadable SKILL.md -> null, not a throw");
-    check(/\(\/project-memory §2\)/.test(describe("record_entry", null)),
+    check(/\(\/docs-sync §2\)/.test(describe("record_entry", null)),
       "falls back to naming the section when no ranges are available");
+    // Each subpart must fall back to ITS OWN skill. Both halves are asserted
+    // because a single map typo would move one and silently leave the other.
+    check(/\(\/project-memory §5\)/.test(describe("bins", null)),
+      "a subpart that did NOT move still names project-memory");
+    check(/\(\/docs-sync §4\)/.test(describe("drift_check", null)),
+      "drift_check names docs-sync §4, its section number AFTER the port");
+    check(skillPathOf("docs-sync") !== skillPathOf("project-memory") &&
+      /docs-sync/.test(skillPathOf("docs-sync")),
+      "skillPathOf resolves a sibling skill, not this one");
 
     const bare = path.join(root, "bare");
     fs.mkdirSync(bare);

@@ -2,7 +2,10 @@
 
 A [Claude Code](https://claude.com/claude-code) skill for keeping a project's
 memory correct across sessions and models. It packages one durable
-documentation system into six on-demand workflows.
+documentation system into two skills: **`project-memory`** (the machinery —
+bootstrap, PRD, bins, templates, scripts and hooks) and **`docs-sync`** (the
+write arm — bring every doc back in line with what the code and the session
+actually did).
 
 > This is the memory / documentation half of a two-repo generalized skill set.
 > The non-memory skills — security gates, model-quality tooling, and review /
@@ -24,30 +27,63 @@ The design goal: a session started cold — by any model, including a cheaper
 one — can read `HANDOFF.md`, pick up the plan, and execute without the owner
 filling gaps from memory.
 
-## Six workflows
+## The workflows, and which skill owns them
+
+Record entry, handoff and drift-check moved from `project-memory` to
+`docs-sync` on 2026-09-09: they are the ones that EDIT docs, they are what
+people actually ask for ("update the docs"), and splitting them keeps each
+skill small enough to load one section instead of the whole file.
+
+`project-memory` — the machinery:
 
 - **Bootstrap** — stand the system up in a new project, seeded from real git
   history (nothing invented).
-- **Record entry** — append one timestamped WHAT/WHY/HOW entry mid-session.
-- **Handoff** — end-of-session sync (record + HANDOFF + a paste-ready
-  next-session prompt).
 - **PRD** — write a roadmap, or execute its next open task end-to-end with the
   project's own definition of done.
 - **Codebase-memory bins** — maintain per-project technical memory that a
   session reads selectively to save tokens.
+
+`docs-sync` — the write arm:
+
+- **The full pass** — one ordered run over every doc a project keeps: record
+  entry, HTML twin, record index, HANDOFF, bins, PRD status, memory files,
+  handoff prompt, each with its own done-check. Triggered by "update the
+  project memory" / "update the docs" / "update everything".
+- **Record entry** — append one timestamped WHAT/WHY/HOW entry mid-session.
+- **Handoff** — end-of-session sync (record + HANDOFF + a paste-ready
+  next-session prompt).
 - **Drift-check** — re-test what HANDOFF claims (tests, services, statuses)
   against reality and report MATCH / DRIFT / UNVERIFIED-TODAY per claim.
 
 ## Install
 
-Copy the `project-memory/` directory into your Claude Code skills folder:
+Copy BOTH skill directories into your Claude Code skills folder — they are
+siblings on purpose, and `pm-cadence` resolves `docs-sync` relative to
+`project-memory`, so splitting them up breaks its reminders:
 
 ```
 ~/.claude/skills/project-memory/
+~/.claude/skills/docs-sync/
 ```
 
-Then invoke it with `/project-memory`, or let it trigger on phrases like
-"handoff", "log this", "bootstrap the docs", or "run the next PRD task".
+Then invoke them with `/project-memory` or `/docs-sync`, or let them trigger on
+phrases like "update the docs", "handoff", "log this", "drift check",
+"bootstrap the docs", or "run the next PRD task".
+
+### The commit gate (optional)
+
+This repo carries its own pre-commit hook at `scripts/git-hooks/pre-commit`.
+It is version controlled rather than living in `.git/hooks`, which git does not
+track — a hook there protects one machine and vanishes on clone. Enable it with:
+
+```
+git config core.hooksPath scripts/git-hooks
+```
+
+It blocks a commit whose staged diff contains a secret. It also runs an
+optional private-identifier check, whose location it reads from
+`git config leakguard.path`; with that unset the check simply does not apply,
+which is the normal case for a clone.
 
 ## Deterministic cadence hooks
 
@@ -102,10 +138,25 @@ Requires `node` on PATH.
 
 ## Files
 
-- `project-memory/SKILL.md` — the skill definition and the six workflows.
+- `docs-sync/SKILL.md` — the write arm: the full pass, record entry, handoff,
+  drift-check.
+- `project-memory/SKILL.md` — the machinery: bootstrap, PRD, bins.
 - `project-memory/templates.md` — copy-ready skeletons for each artifact.
-- `project-memory/hooks/pm-cadence.js` — counts prompts, injects the reminder.
+- `project-memory/append-record-entry.js` — the only sanctioned way to append
+  to an appendix-style record. Derives the next letter from a live scan,
+  refuses a duplicate across any dash style, and re-checks four invariants
+  after writing, rolling back if any fails. `--canary` self-tests it.
+- `project-memory/hooks/pm-cadence.js` — compares project file mtimes against
+  the doc that should describe them and injects a reminder naming the section
+  to read, by line range.
 - `project-memory/hooks/pm-cadence-autoinit.js` — auto-creates the config on
   first invocation.
+- `project-memory/hooks/pretooluse-record-guard.js` — denies a direct
+  Edit/Write to an append-only record, so every write goes through the
+  locking appender. A heading written without its TOC line breaks the record
+  for every later append.
+- `project-memory/hooks/pre-commit-record` — the same invariants at commit
+  time.
 - `project-memory/profiles/research.md`, `profiles/website.md` — per-project-type
   starting points for the bins.
+- `scripts/git-hooks/pre-commit` — this repo's own commit gate (see Install).

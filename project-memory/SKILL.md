@@ -1,15 +1,15 @@
 ---
 name: project-memory
 description: >-
-  A project memory + execution-doc system: HANDOFF.md
-  (only live snapshot) + append-only record + standing PRD_ROADMAP.md +
-  codebase-memory bins. Six workflows: BOOTSTRAP, RECORD ENTRY, HANDOFF sync,
-  PRD write / EXECUTE next task, BINS, DRIFT-CHECK. Use when:
-  "/project-memory", "handoff", "update the docs/record", "log this", "record
-  this", "bootstrap the memory system", "next task", "continue the roadmap",
-  "drift check", "is HANDOFF still true" — or when wrapping up a session, in a
-  project lacking HANDOFF.md, or given no direction where a PRD_ROADMAP.md
-  exists. Read templates.md before creating any doc.
+  A project memory + execution-doc system: HANDOFF.md (only live snapshot) +
+  append-only record + standing PRD_ROADMAP.md + codebase-memory bins. Owns
+  the MACHINERY and three workflows: BOOTSTRAP, PRD write/execute-next-task,
+  and the codebase-memory BINS — plus templates.md, append-record-entry.js and
+  the cadence/record hooks everything else runs on. Use when: "/project-memory",
+  "bootstrap the memory system", "write a PRD", "next task", "continue the
+  roadmap", "update the bins", or in a project lacking HANDOFF.md. **Updating
+  docs — record entry, handoff, drift check — moved to /docs-sync 2026-09-09.**
+  Read templates.md before creating any doc.
 ---
 
 # project-memory — the doc/memory system
@@ -171,64 +171,17 @@ ever reads this section. The model's only remaining job:
    what the project is, where it stands, what to do next? Fix now if not.
 7. Report what was seeded from real history vs. left empty.
 
-## 2. RECORD ENTRY (mid-session "log this" — no full handoff ceremony)
+## 2. RECORD ENTRY — MOVED to /docs-sync §2
 
-1. Find the record file and its convention (check HANDOFF.md §Documentation).
-   **Appendix-style records: APPEND WITH THE SCRIPT, never by hand.**
+Ported to `/docs-sync` on 2026-09-09. The appender it drives,
+`append-record-entry.js`, still lives HERE and is still the only sanctioned
+way to append — hand-splicing remains the documented failure mode.
 
-   ```
-   node ~/.claude/skills/project-memory/append-record-entry.js \
-     --record "<path>" --title "<title>" --date "<from a real `date` call>" \
-     --body <file>            # add --dry-run to preview
-   ```
+## 3. HANDOFF — MOVED to /docs-sync §3
 
-   It derives the next letter from a LIVE scan, refuses a duplicate across any
-   dash style, places the TOC line after the last existing one, computes the
-   anchor with the renderer's own slug algorithm, and re-checks four invariants
-   after writing (append-only, no duplicate letters, letters ordered,
-   TOC/heading counts equal) — rolling the write back if any fails.
-
-   **Hand-splicing is the documented failure mode, not a shortcut.** Sessions
-   wrote five bespoke splice scripts in one week; one appended a duplicate
-   `BM` over three other sessions' entries because it derived "next" from the
-   last entry IT had read, and its own guard missed the collision because that
-   entry used a different dash. Record BT. The instruction to grep for the last
-   letter was already here and was followed — that is the point: this is a gate,
-   and gates get scripts.
-
-   The dated-section convention (`## YYYY-MM-DD — <title>` sections in `docs/record_<date>.md`)
-   is a different convention — the script refuses it rather than guessing; hand-
-   append there, matching the file's existing shape.
-2. Entry content: absolute date + approx time ("2026-07-08 ~16:40"); WHAT
-   changed · WHY (problem, tradeoff) · HOW (approach, especially non-obvious
-   or after an abandoned attempt); any bug as symptom → root cause → fix;
-   honest open items labeled as such. Failures and slips stated, not smoothed.
-   When reality shifted significantly (audit, re-baseline, deployment or
-   architecture change), the entry carries a full point-in-time snapshot
-   section (tables preferred) — snapshots live in the record, nowhere else.
-3. APPEND ONLY — corrections are NEW entries referencing the old one.
-4. Regenerate the HTML twin where one exists, by script only (e.g.
-   `.venv\Scripts\python.exe -m scripts.render_record_html`, or
-   `python -m scripts.render_record_html`). The renderer's `broken:` count
-   verifies your TOC anchors — it must print `broken: 0`.
-5. Don't update HANDOFF.md from this workflow — that's §3's job (offer it if
-   the entry reveals it's stale).
-
-## 3. HANDOFF (end of session, "update everything")
-
-1. **Gather facts**: what actually changed this session — files, decisions,
-   bugs, unresolved items. Use `git status`/`git log` since session start.
-   Nothing that was only planned.
-2. **Record**: append the entry per §2 (including the snapshot section when
-   reality shifted).
-3. **HANDOFF.md**: update Current state + the **Last updated:** date; move
-   displaced history into the record, not the trash.
-4. **HTML twins** by script, per §2.4.
-5. **Memory files**: if a durable fact changed (constraint, convention,
-   roadmap shift), update the auto-memory file + its MEMORY.md index line.
-6. **Handoff prompt**: end with a fenced, paste-ready prompt for the next
-   session — read order (HANDOFF.md → record front-matter → PRD), 1-paragraph
-   current state, hard constraints, concrete next actions in priority order.
+Ported to `/docs-sync` on 2026-09-09, along with the ordered full pass that
+runs it (`/docs-sync` §1: record entry, HTML twin, record index, HANDOFF,
+bins, PRD status, memory files, handoff prompt).
 
 ## 4. PRD — write one, or execute its next task
 
@@ -445,35 +398,11 @@ with a dozen tool calls before it can start.
   its code and docs, write `— purpose unclear, not yet traced`. A confident
   wrong label is what makes a map actively harmful.
 
-## 6. DRIFT-CHECK ("verify the docs", "drift check", "is HANDOFF still true?")
+## 6. DRIFT-CHECK — MOVED to /docs-sync §4
 
-The verification arm of the system: HANDOFF.md is the only live snapshot, and a
-cheap model's worst failure mode is confidently acting on a stale one. This
-workflow re-tests what HANDOFF CLAIMS against reality and reports the drift.
-Scope is strictly HANDOFF.md's claims — NOT the skill docs, NOT a code audit
-(that's /audit's job).
-
-1. **Extract claims.** Read HANDOFF.md and list every INDEPENDENTLY VERIFIABLE
-   claim: test suites and their pinned results, services/ports said to be
-   running, scheduled tasks said to exist, files/DBs said to exist (with sizes),
-   workstream statuses ("Done" ⇒ the commit exists), dates ("Last updated").
-2. **Classify each claim:**
-   - CHEAP — verifiable now with a read-only or fast command → run it.
-   - EXPENSIVE/RISKY — needs a long run, a protected time window, or touches
-     live state (anything that trades, writes a shared DB) → do NOT run;
-     report as UNVERIFIED-TODAY with the exact command a future session should
-     use, and why it was skipped.
-3. **Run the cheap checks for real.** Paste real output. Respect the project's
-   hard rules while checking (e.g. read-only DB access, stay out of a
-   5:00–6:30pm window; never run anything that trades).
-4. **Report a drift table:** claim → observed reality → verdict per row:
-   **MATCH** / **DRIFT** (with the delta) / **UNVERIFIED-TODAY** (with reason).
-   Outcome-first: lead with "no drift" or the count of drifted rows.
-5. **On DRIFT:** the report is the deliverable — fix HANDOFF only with the
-   owner's go-ahead (or when the fix is unambiguous, e.g. a stale date), and
-   any fix routes through §3 (record entry + HANDOFF update), never a silent
-   edit. For historical disagreements the record wins; HANDOFF is what gets
-   corrected.
+Ported to `/docs-sync` on 2026-09-09. Note the section NUMBER changed (§6
+here became §4 there); `pm-cadence`'s SECTIONS map carries the new one, and
+its canary asserts it.
 
 ## Rules (all workflows)
 
