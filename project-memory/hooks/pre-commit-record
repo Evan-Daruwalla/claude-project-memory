@@ -6,7 +6,7 @@
 #   [ -f "$REC_GUARD" ] && { sh "$REC_GUARD" || exit 1; }
 #
 # WHY IT IS DELEGATED. The same block was inlined in exactly ONE repo's hook
-# (Skills) while five other repos held an append-only record and gated nothing —
+# (one repo) while five others held an append-only record and gated nothing —
 # so a hand-splice, the failure that silently overwrote another session's entry
 # in record BT, was blocked in one place and free everywhere else. Inlining a
 # copy per repo is how the SECRET gate's fixes kept landing on files that never
@@ -25,7 +25,7 @@ CHECKER="${HOME}/.claude/skills/project-memory/append-record-entry.js"
 # --name-only` octal-escapes non-ASCII paths under the default core.quotepath —
 # so it is read back FROM GIT with quotepath off and matched on an ASCII-only
 # substring. Embedding the literal filename here is how the twin-sync grep in
-# Skills' own hook got its bug.
+# that repo's own hook got its bug.
 REC_MD=$(git -c core.quotepath=false diff --cached --name-only \
   | grep -F -- "Full Chronological History.md" | head -1)
 

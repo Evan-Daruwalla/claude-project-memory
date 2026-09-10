@@ -59,7 +59,7 @@ function deny(reason) {
 
 // The record's filename carries an em dash (U+2014) and spaces. Following
 // hooks/pre-commit-record, the pattern is ASCII-ONLY and anchored to the tail:
-// embedding the literal filename is how the twin-sync grep in Skills' own hook
+// embedding the literal filename is how the twin-sync grep in one repo's own hook
 // got its bug. Nothing in the match path can throw — match first, stat later.
 const RECORD_TAIL = "full chronological history.md";
 // The OTHER convention (`## YYYY-MM-DD — <title>` sections), which
@@ -245,7 +245,7 @@ function runCanary() {
     check(decide("not json").d === "warn",
       "malformed stdin -> loud fail-OPEN, not a session-wide wedge");
     check(decide("").d === "warn", "empty stdin -> loud fail-open");
-    check(decide(ev(rec + " ")).d !== "other", "junk suffix never crashes");
+    check(decide(ev(rec + "\u0000")).d !== "other", "junk suffix never crashes");
 
     // --- the contract -----------------------------------------------------
     check([decide(ev(rec)), decide("not json"), decide(ev("x.py"))]

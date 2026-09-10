@@ -39,7 +39,7 @@
  * Exit: 0 ok · 1 refused (collision / invariant failure) · 2 usage error.
  *
  * SCOPE: records using `# Appendix <LETTERS> <dash> <title>` headings (the
- * a lettered-appendix project/Skills convention). Records using `## YYYY-MM-DD — <title>` sections
+ * a lettered-appendix convention). Records using `## YYYY-MM-DD — <title>` sections
  * (a dated-section convention) are NOT handled — this refuses rather than
  * guessing, because silently appending in the wrong shape is worse than an abort.
  */

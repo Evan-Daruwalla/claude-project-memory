@@ -71,8 +71,16 @@ else
     echo "(To override in a true emergency: git commit --no-verify.)" >&2
     exit 1
   elif [ "$lstatus" -ne 0 ]; then
-    echo "commit-gate WARNING: leak-guard error (exit $lstatus) — private-identifier gate SKIPPED (fail-open)." >&2
-    echo "The commit proceeds UNSCANNED for private names." >&2
+    # FAIL CLOSED. This warned and let the commit through, so a guard that
+    # CRASHED — unreadable workspace, git failure, buffer overflow — certified
+    # the diff it never read. The secret scanner above may fail open (a missing
+    # scanner must not wedge every commit); this one must not, because its whole
+    # job is to decide whether something private is about to be published.
+    echo "" >&2
+    echo "commit-gate: leak-guard could not run (exit $lstatus) — commit BLOCKED." >&2
+    echo "A guard that cannot run must not certify. Fix node/the guard path, or" >&2
+    echo "override deliberately with: git commit --no-verify" >&2
+    exit 1
   fi
 fi
 
