@@ -55,7 +55,10 @@ fi
 #
 LEAKGUARD=$(git config leakguard.path || true)
 if [ -z "$LEAKGUARD" ]; then
-  echo "commit-gate: leakguard.path not configured — private-identifier gate not applicable here." >&2
+  # Carries the shared "SKIPPED" token so a grep finds every skip branch, but
+  # deliberately NOT a WARNING: outside the origin machine there is no private
+  # workspace to leak, so this is correct rather than degraded.
+  echo "commit-gate NOTICE: leakguard.path not configured — private-identifier gate SKIPPED (not applicable outside the origin machine)." >&2
 elif [ ! -f "$LEAKGUARD" ]; then
   echo "commit-gate WARNING: leakguard.path is set to '$LEAKGUARD' but no file is there —" >&2
   echo "private-identifier gate SKIPPED (fail-open). Fix the path or unset the config." >&2
