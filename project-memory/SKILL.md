@@ -414,3 +414,11 @@ its canary asserts it.
 - HTML twins are script-generated only.
 - Cadence misses are logged, not hidden ("cadence missed by N prompts").
 - Structure from the templates; content from this project.
+
+`node append-record-entry.js --canary` — MUST print `CANARY PASS 52/52` before you trust a result.
+
+`node hooks/pm-cadence-autoinit.js --canary` — MUST print `CANARY PASS 11/11` before you trust a result.
+
+`node hooks/pm-cadence.js --canary` — MUST print `CANARY PASS 54/54` before you trust a result.
+
+`node hooks/pretooluse-record-guard.js --canary` — MUST print `CANARY PASS 23/23` before you trust a result.
