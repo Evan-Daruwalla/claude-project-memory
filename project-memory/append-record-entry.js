@@ -88,7 +88,11 @@ function detectEol(text) {
   return crlf > lf ? '\r\n' : '\n';
 }
 
-// ---- letters: bijective base-26, A..Z, AA, AB, ... BZ, CA ------------------
+// ---- letters: bijective base-26 -------------------------------------------
+// A..Z, then AA AB .. AZ, BA .. BZ, CA .. ZZ, then THREE letters: AAA AAB ..
+// AAZ, ABA. There is no "A0" and no reset — index 702 is ZZ and 703 is AAA.
+// Bijective means every id has exactly one index, so the ordered-letters
+// invariant keeps working across the length change (ZZ=702 < AAA=703).
 function letterToIndex(s) {
   let n = 0;
   for (const ch of s) n = n * 26 + (ch.charCodeAt(0) - 64);
@@ -443,6 +447,18 @@ function canary() {
   t('Z rolls to AA', indexToLetter(letterToIndex('Z') + 1) === 'AA');
   t('BZ rolls to CA', indexToLetter(letterToIndex('BZ') + 1) === 'CA');
   t('letter round-trips', indexToLetter(letterToIndex('BT')) === 'BT');
+
+  // 3b. The boundaries of the convention, stated 2026-09-20. Until then the
+  // only rollover ever asserted was Z -> AA, so nothing had run a THREE-letter
+  // id through the heading regex, the TOC line or the invariants. The live
+  // record hits ZZ at entry 702; today it is at DJ (114).
+  t('AZ rolls to BA', indexToLetter(letterToIndex('AZ') + 1) === 'BA');
+  t('ZZ rolls to AAA', indexToLetter(letterToIndex('ZZ') + 1) === 'AAA');
+  t('AAZ rolls to ABA', indexToLetter(letterToIndex('AAZ') + 1) === 'ABA');
+  const pZZ = mk([{ l: 'ZY', t: 'second last', d: '-' }, { l: 'ZZ', t: 'last two-letter', d: '-' }]);
+  const rZZ = appendEntry({ recordPath: pZZ, title: 'first three-letter', date: '2026-01-05, ~00:00 CST', body: 'x\n' });
+  t('a real append after ZZ writes AAA and leaves the record valid',
+    rZZ.ok && rZZ.letter === 'AAA' && checkRecord(fs.readFileSync(pZZ, 'utf8')).ok === true);
 
   // 4. TOC line lands after the LAST toc line
   const after1 = fs.readFileSync(p1, 'utf8').split('\n');

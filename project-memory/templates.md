@@ -113,7 +113,12 @@ architecture change), the entry ALSO carries a full point-in-time snapshot
 section (tables preferred). Snapshots live inside the record; `HANDOFF.md` is
 the only live one.
 
-Appendix letters run A–Z then AA, AB, … Update the front-matter TOC with the
+Appendix letters are bijective base-26 and only ever move forward:
+**A–Z, then AA AB … AY AZ, BA BB … BZ, CA … ZZ, then three letters — AAA AAB
+… AAZ, ABA.** There is no reset and no reuse: ZZ is index 702 and AAA is 703,
+so the ids stay sortable across the length change. Derive the next one with
+`--next-letter` (a live scan of the record), never by eye and never from the
+last entry you happen to have read. Update the front-matter TOC with the
 matching line each time (additive; entries themselves are immutable). After
 regenerating the HTML twin, its broken-internal-link count must be 0 — that
 verifies your TOC anchors.
