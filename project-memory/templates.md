@@ -10,16 +10,16 @@ replace. Existing files keep their own established convention.
 
 ## Goal
 
-<Why the project exists, in the owner's terms — the deliverable and the
+<Why the project exists, in the owner's terms - the deliverable and the
 constraint, one short paragraph. Lead with the actual objective and the reason
 it matters, not a feature list.>
 
-## Current state — <one-line headline>
+## Current state - <one-line headline>
 
-**Last updated: <YYYY-MM-DD>** — this file is the only live snapshot; history
+**Last updated: <YYYY-MM-DD>** - this file is the only live snapshot; history
 lives in the record.
 
-> **<YYYY-MM-DD> — <major recent event> (record <entry ref>).** <2–4 line
+> **<YYYY-MM-DD> - <major recent event> (record <entry ref>).** <2-4 line
 > callout for anything a fresh session must not miss.>
 
 <The current inventory: tables preferred over prose. For PRD-driven projects,
@@ -35,14 +35,14 @@ use a workstream table mapped to PRD milestones:>
 ## Script | Purpose) / Known limitations / Operations / ...>
 
 ## Documentation
-- `<record file>` — <one line: append-only chronological record + how the HTML
+- `<record file>` - <one line: append-only chronological record + how the HTML
   twin regenerates, if one exists>
-- `PRD_ROADMAP.md` — the standing plan. Source of truth for what to build and
+- `PRD_ROADMAP.md` - the standing plan. Source of truth for what to build and
   in what order.
 - <other docs, one line each>
 
 ## BLOCKED (needs the owner)  <!-- PRD-driven projects -->
-- <item> · <item> — everything downstream works against stubs until resolved.
+- <item>; <item> - everything downstream works against stubs until resolved.
 ```
 
 ## §2 Record (append-only chronological history)
@@ -50,11 +50,11 @@ use a workstream table mapped to PRD milestones:>
 New-project skeleton:
 
 ```markdown
-# Project Record — Full Chronological History
+# Project Record - Full Chronological History
 
 Written <YYYY-MM-DD>. Every entry is grounded in one of:
 - <the real sources: git history, file modification timestamps, output
-  artifacts, existing doc content, memory files — list what THIS record
+  artifacts, existing doc content, memory files - list what THIS record
   actually uses>
 
 Sections where a timestamp can't be precisely verified are explicitly
@@ -69,10 +69,10 @@ marked. No fabricated metrics, dates, or file names.
 
 This record has two parts plus this navigation front-matter:
 
-- **Part I — Phases** (`##` headings): the original consolidation, written in
+- **Part I - Phases** (`##` headings): the original consolidation, written in
   one pass from real history at bootstrap time.
-- **Part II — Appendices A–…** (`#` headings): chronological addenda appended
-  one session at a time per the `CLAUDE.md` cadence rule. **Append-only** —
+- **Part II - Appendices A-...** (`#` headings): chronological addenda appended
+  one session at a time per the `CLAUDE.md` cadence rule. **Append-only** -
   prior appendices are never edited.
 
 The two heading levels encode that distinction (Phases are sections of the
@@ -86,11 +86,11 @@ the dated entry, not the digest.
 
 # Table of Contents
 
-**Part I — Original record (<YYYY-MM-DD>)**
-- [Phase 0 — <title>](#<anchor>) (~<MM-DD>)
+**Part I - Original record (<YYYY-MM-DD>)**
+- [Phase 0 - <title>](#<anchor>) (~<MM-DD>)
 
-**Part II — Appendices (chronological)**
-- [A — <short title>](#<anchor>) (<MM-DD>)
+**Part II - Appendices (chronological)**
+- [A - <short title>](#<anchor>) (<MM-DD>)
 ```
 
 Entry format (Part II — one per session/batch; heading is EXACT):
@@ -98,14 +98,14 @@ Entry format (Part II — one per session/batch; heading is EXACT):
 ```markdown
 # Appendix <XX> - <Title, compressed but specific> (<YYYY-MM-DD>[, ~HH:MM local])
 
-<Structured prose covering WHAT changed · WHY (problem solved, tradeoff
-weighed) · HOW (approach, especially non-obvious or after an abandoned
-attempt). Bold labels (**WHAT:**/**WHY:**/**HOW:**) optional — follow the
-file's precedent. Bugs as symptom → root cause → fix. Unresolved items get an
+<Structured prose covering WHAT changed; WHY (problem solved, tradeoff
+weighed); HOW (approach, especially non-obvious or after an abandoned
+attempt). Bold labels (**WHAT:**/**WHY:**/**HOW:**) optional - follow the
+file's precedent. Bugs as symptom -> root cause -> fix. Unresolved items get an
 explicit callout:>
 
 **HONEST OPEN ITEM (not fixed):** <what's still broken/unknown, flagged for a
-future session — never smoothed over.>
+future session - never smoothed over.>
 ```
 
 When reality shifted significantly (audit, re-baseline, deployment or
@@ -126,18 +126,18 @@ verifies your TOC anchors.
 ## §3 PRD_ROADMAP.md
 
 ```markdown
-# <Project> — <scope> PRD & Roadmap
+# <Project> - <scope> PRD & Roadmap
 
-**Written <YYYY-MM-DD> by <author/session>. Standing document — the executing
+**Written <YYYY-MM-DD> by <author/session>. Standing document - the executing
 model works through TASK BREAKDOWN top to bottom, one task at a time, and
 checks off SUCCESS CRITERIA.**
 
-**GOAL:** <ONE paragraph stating the exact goal of this plan — what will
+**GOAL:** <ONE paragraph stating the exact goal of this plan - what will
 exist when it is done, for whom, and the single sentence a fresh session
 reads to stay squarely on track. Not vision, not process: the goal.
 (Required, always at the top of the file.)>
 
-**SCOPE GUARD (decided <YYYY-MM-DD>): <hard scope limits — what this plan must
+**SCOPE GUARD (decided <YYYY-MM-DD>): <hard scope limits - what this plan must
 NOT touch. If a task seems to require it, STOP and report.>**
 <!-- scope guard optional; include when the project has live state to protect -->
 
@@ -174,7 +174,7 @@ even if convenient"), and an Environment block (shell quirks, venv paths).>
 
 ## 6. TASK BREAKDOWN
 
-### M1 — <name>
+### M1 - <name>
 
 1. **<Task title>.** <What to do, which files it touches.> Done: <the
    observable check>.
@@ -182,7 +182,7 @@ even if convenient"), and an Environment block (shell quirks, venv paths).>
 ## 7. HANDOFF NOTES
 
 **Read first, in order:** <files>.
-**Work order:** M1 → M<N> strictly. One task per sitting; finish (tests green
+**Work order:** M1 -> M<N> strictly. One task per sitting; finish (tests green
 + commit + record entry) before starting the next.
 **Gotchas that will bite you:**
 - <each one concrete, from real experience>
@@ -204,26 +204,26 @@ is only struck, never erased.
 `INDEX.md` (≤25 lines):
 
 ```markdown
-# codebase-memory index — <project>
+# codebase-memory index - <project>
 
 Core bins:
-- security.md — <one-line scope> (updated <YYYY-MM-DD>)
-- performance.md — <scope> (updated <YYYY-MM-DD>)
-- architecture.md — <scope> (updated <YYYY-MM-DD>)
-- features.md — <scope> (updated <YYYY-MM-DD>)
-- conventions.md — <scope> (updated <YYYY-MM-DD>)
-- gotchas.md — <scope> (updated <YYYY-MM-DD>)
+- security.md - <one-line scope> (updated <YYYY-MM-DD>)
+- performance.md - <scope> (updated <YYYY-MM-DD>)
+- architecture.md - <scope> (updated <YYYY-MM-DD>)
+- features.md - <scope> (updated <YYYY-MM-DD>)
+- conventions.md - <scope> (updated <YYYY-MM-DD>)
+- gotchas.md - <scope> (updated <YYYY-MM-DD>)
 
 Standards bins (only those the codebase actually commits to):
-- dependencies.md — libraries/frameworks + pinned versions + why (updated <YYYY-MM-DD>)
-- ui.md — UI + UX: design language / component / styling / motion / a11y + UX flows / IA / states (updated <YYYY-MM-DD>)
-- testing.md — framework, test layout, coverage/frozen rules (updated <YYYY-MM-DD>)
-- data.md — schema/migration + API/interface contracts (updated <YYYY-MM-DD>)
-- tooling.md — build/lint/format/CI + required commands (updated <YYYY-MM-DD>)
-- disclosure.md — what may leave the project: non-code stakeholders, what a case study / screenshot / demo / public README may show (updated <YYYY-MM-DD>)
+- dependencies.md - libraries/frameworks + pinned versions + why (updated <YYYY-MM-DD>)
+- ui.md - UI + UX: design language / component / styling / motion / a11y + UX flows / IA / states (updated <YYYY-MM-DD>)
+- testing.md - framework, test layout, coverage/frozen rules (updated <YYYY-MM-DD>)
+- data.md - schema/migration + API/interface contracts (updated <YYYY-MM-DD>)
+- tooling.md - build/lint/format/CI + required commands (updated <YYYY-MM-DD>)
+- disclosure.md - what may leave the project: non-code stakeholders, what a case study / screenshot / demo / public README may show (updated <YYYY-MM-DD>)
 
-Map (not a bin — see SKILL §5.1):
-- DIRECTORY.md — tree map + entry points + spine + unreferenced (reflects <sha>, <YYYY-MM-DD>)
+Map (not a bin - see SKILL section 5.1):
+- DIRECTORY.md - tree map + entry points + spine + unreferenced (reflects <sha>, <YYYY-MM-DD>)
 
 Cross-bin invariants:
 - <only ones short enough to always load>
@@ -233,40 +233,40 @@ Cross-bin invariants:
 (roughly >15 source files); skip it and say so otherwise:
 
 ```markdown
-# codebase directory — <project>
+# codebase directory - <project>
 
 Reflects commit `<sha>` (<YYYY-MM-DD>).
-<!-- no VCS? replace with: "no VCS — unverifiable, re-derive on read" -->
+<!-- no VCS? replace with: "no VCS - unverifiable, re-derive on read" -->
 **Structure check (tree + entry points):** `git diff --name-status
---diff-filter=ADR <sha>..HEAD -- <mapped dirs>` — empty = still accurate.
+--diff-filter=ADR <sha>..HEAD -- <mapped dirs>` - empty = still accurate.
 (Not `--stat`: that fires on content-only edits and trains you to ignore it.)
-**Spine + unreferenced:** no cheap check — re-derive before relying on them.
+**Spine + unreferenced:** no cheap check - re-derive before relying on them.
 Map, not rationale: moving a file changes this doc; changing your mind changes
 `architecture.md`.
-**Mapped per-module:** <dirs> · **Summarized only:** <dirs, or "none">
+**Mapped per-module:** <dirs>; **Summarized only:** <dirs, or "none">
 
 ## Tree
-- `<dir>/` — <what it IS, one line>
-  - `<module>.<ext>` — <what it IS>   <!-- "— purpose unclear, not yet traced" if genuinely unknown; never guess -->
+- `<dir>/` - <what it IS, one line>
+  - `<module>.<ext>` - <what it IS>   <!-- "- purpose unclear, not yet traced" if genuinely unknown; never guess -->
 
 ## Entry points (what actually gets invoked)
-- `<cmd or path>` — <run by whom: human / scheduler / CI> — <what it does>
+- `<cmd or path>` - <run by whom: human / scheduler / CI> - <what it does>
 <!-- look past imports: CLI dispatch, __main__, hook/plugin config, route
      decorators, scheduled jobs, package scripts -->
 
-## Spine (most-imported — blast centers)
+## Spine (most-imported - blast centers)
 Derived by: `<the exact command, so this regenerates identically>`
-- `<module>` — imported by <N> (<names>)
+- `<module>` - imported by <N> (<names>)
 <!-- forms you could not count (dynamic/star/re-export)? name them; never guess -->
 
 ## Unreferenced by static import (nothing imports / no test touches)
 Derived by: `<the exact command>`
-- `<module>` — <no importer | no test | both>
+- `<module>` - <no importer | no test | both>
 <!-- check against Entry points before believing: a live module listed dead
      invites a deletion -->
 
 <!-- Tree lines are hand-written and preserved. Entry points / spine /
-     unreferenced are mechanically derived — regenerate, do not hand-edit. -->
+     unreferenced are mechanically derived - regenerate, do not hand-edit. -->
 ```
 
 Bootstrap the FULL set (core + standards), not opt-in. A standard this project

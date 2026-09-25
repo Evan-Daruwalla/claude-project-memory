@@ -60,7 +60,7 @@ const DASH = '[-‐‑‒–—―]';
 // number and the actual reason rather than libelling the record.
 const HEADING_RE = new RegExp('^# Appendix ([A-Z]+)\\s*' + DASH + '\\s');
 const CANON_DASH = '-';        // 65 of 72 existing headings use ASCII hyphen
-const TOC_DASH = '—';     // TOC titles use an em dash (established pattern)
+const TOC_DASH = '-';     // ASCII only since 2026-09-23 (was an em dash; older TOC lines keep theirs)
 
 // The TOC's Part II header from templates.md §2. Dash-agnostic for the same
 // reason HEADING_RE is: a hand-typed hyphen or en dash must not hide it.
@@ -214,6 +214,22 @@ function appendEntry(opts) {
 
   if (/[\r\n]/.test(title)) {
     return { ok: false, code: 2, msg: 'title contains a line break — the TOC line and the heading would each split across two lines' };
+  }
+
+  // ASCII only (rule 2026-09-23): the record is a .md file this skill writes,
+  // so every byte this call adds must be 0x00-0x7F. Refuse rather than
+  // transliterate, and name the first offender so the author can fix the text
+  // they wrote. Earlier entries are never checked: they are immutable, and
+  // many carry em dashes from before the rule. A leading BOM on --body is an
+  // encoding artifact that is stripped below, not content, so it is skipped.
+  for (const [what, raw] of [['title', title], ['date', date], ['body', String(body || '').replace(/^﻿/, '')]]) {
+    const s = String(raw || '');
+    const i = s.search(/[^\x00-\x7F]/);
+    if (i !== -1) {
+      const line = s.slice(0, i).split('\n').length;
+      const cp = s.codePointAt(i).toString(16).toUpperCase().padStart(4, '0');
+      return { ok: false, code: 2, msg: `non-ASCII character U+${cp} in the ${what} (line ${line}): the record is ASCII only since 2026-09-23. Replace it (em dash -> "-", arrow -> "->", curly quotes -> straight quotes) and re-run. Nothing was written.` };
+    }
   }
 
   const letter = nextFreeLetter(before);
@@ -499,6 +515,17 @@ function canary() {
 
   // 10. new heading is normalised to the canonical dash even in an em-dash file
   t('new heading uses the canonical ascii dash', fs.readFileSync(p1, 'utf8').includes('# Appendix BN - new'));
+  // ASCII only (rule 2026-09-23). The lines THIS script wrote must be pure
+  // ASCII; the fixture's older lines keep their em dashes on purpose.
+  const bnLines = fs.readFileSync(p1, 'utf8').split('\n').filter((l) => /^(# Appendix BN |- \[BN )/.test(l));
+  t('the new heading and TOC line are pure ASCII', bnLines.length === 2 && bnLines.every((l) => /^[\x00-\x7F]*$/.test(l)));
+  const pAsc = mk([{ l: 'C', t: 'plain', d: '-' }]);
+  const bAsc = fs.readFileSync(pAsc, 'utf8');
+  const rAscBody = appendEntry({ recordPath: pAsc, title: 'dash', date: '2026-01-03, ~00:00 CST', body: 'an em dash — here\n' });
+  t('a non-ASCII body is refused (exit 2)', rAscBody.ok === false && rAscBody.code === 2);
+  t('a refused append leaves the record byte-identical', fs.readFileSync(pAsc, 'utf8') === bAsc);
+  const rAscTitle = appendEntry({ recordPath: pAsc, title: 'arrow → title', date: '2026-01-03, ~00:00 CST', body: 'x\n' });
+  t('a non-ASCII title is refused too', rAscTitle.ok === false && rAscTitle.code === 2 && fs.readFileSync(pAsc, 'utf8') === bAsc);
 
   // ---- 2026-08-20 audit: every assertion below pins a defect that shipped
   // green past the 15 above. They are the point of this block, not decoration.

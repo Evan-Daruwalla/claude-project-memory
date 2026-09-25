@@ -155,6 +155,11 @@ Requires `node` on PATH.
   Edit/Write to an append-only record, so every write goes through the
   locking appender. A heading written without its TOC line breaks the record
   for every later append.
+- `project-memory/hooks/pretooluse-ascii-md.js` - denies a Write, Edit or
+  MultiEdit that ADDS non-ASCII characters to a .md file (rule added
+  2026-09-23); non-ASCII already in the file can stay. Register it as a
+  `PreToolUse` hook on matcher `Edit|Write|MultiEdit`.
+  `ASCII_MD_GUARD_OFF=1` turns it off.
 - `project-memory/hooks/pre-commit-record` — the same invariants at commit
   time.
 - `project-memory/profiles/research.md`, `profiles/website.md` — per-project-type

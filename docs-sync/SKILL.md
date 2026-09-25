@@ -199,3 +199,21 @@ HANDOFF.md's claims — NOT the skill docs, NOT a code audit (that's `/audit`).
 | Cadence hook config | `/project-memory` §0 |
 | Are the docs TRUE? (findings, no edits) | `/audit-docs` |
 | Did my change land where it executes? | `/landing-check` |
+
+## ASCII-only markdown (rule added 2026-09-23)
+
+Every `.md` file this skill creates or writes to gets ASCII characters only
+(bytes 0x00-0x7F) in the text you add. No exceptions for headings, tables,
+quotes, names or pasted tool output.
+
+- Dashes: `-` (never an en or em dash). Arrows: `->` and `<-`. Quotes:
+  straight `"` and `'`. Ellipsis: `...`. Math: `x`, `+/-`, `<=`, `>=`, `~`.
+  Separators: `-`, `;` or `|`. No emoji, no check-mark glyphs (use `[x]` and
+  `[ ]`), no accented letters: transliterate names and quoted text.
+- Check before saving. In a git repo,
+  `git diff -U0 -- <file> | grep -v '^+++' | grep '^+' | grep -nP '[^\x00-\x7F]'`
+  must print nothing. For a new or untracked file,
+  `grep -nP '[^\x00-\x7F]' <file>` must print nothing.
+- Leave non-ASCII in text you did not write. Earlier entries of an
+  append-only record stay byte for byte; converting an existing file is a
+  separate, explicit job.

@@ -25,7 +25,7 @@ some projects' records use `## YYYY-MM-DD — title` entries instead of
 | File | Role | Mutability |
 |---|---|---|
 | `HANDOFF.md` | The only live snapshot; a fresh session reads it FIRST | Rewritten freely; keep it a snapshot, move history to the record |
-| `docs/Project Record — Full Chronological History.md` (or `docs/record_<date>.md`) | Append-only chronological build log — the ground truth; when anything disagrees with it, the record wins. Point-in-time snapshots live INSIDE it as dated entries | APPEND-ONLY; front-matter TOC gets one new line per entry; prior entries never edited |
+| `docs/Project Record - Full Chronological History.md` for a new project (ASCII name; an existing record keeps the name it has) (or `docs/record_<date>.md`) | Append-only chronological build log — the ground truth; when anything disagrees with it, the record wins. Point-in-time snapshots live INSIDE it as dated entries | APPEND-ONLY; front-matter TOC gets one new line per entry; prior entries never edited |
 | `PRD_ROADMAP.md` | Standing plan a model executes task-by-task | Grows by APPEND; never wholesale-deleted/retyped. Removed steps are struck through in place (kept + dated); a new direction is a dated FORK marked as the current plan (see §4) |
 | `.claude/codebase-memory/` | Binned technical memory (see §5) | Superseded in place, same session as the code change |
 
@@ -415,10 +415,30 @@ its canary asserts it.
 - Cadence misses are logged, not hidden ("cadence missed by N prompts").
 - Structure from the templates; content from this project.
 
-`node append-record-entry.js --canary` — MUST print `CANARY PASS 56/56` before you trust a result.
+`node append-record-entry.js --canary` — MUST print `CANARY PASS 60/60` before you trust a result.
 
 `node hooks/pm-cadence-autoinit.js --canary` — MUST print `CANARY PASS 11/11` before you trust a result.
 
 `node hooks/pm-cadence.js --canary` — MUST print `CANARY PASS 54/54` before you trust a result.
 
 `node hooks/pretooluse-record-guard.js --canary` — MUST print `CANARY PASS 23/23` before you trust a result.
+
+`node hooks/pretooluse-ascii-md.js --canary` - MUST print `CANARY PASS 18/18` before you trust a result.
+
+## ASCII-only markdown (rule added 2026-09-23)
+
+Every `.md` file this skill creates or writes to gets ASCII characters only
+(bytes 0x00-0x7F) in the text you add. No exceptions for headings, tables,
+quotes, names or pasted tool output.
+
+- Dashes: `-` (never an en or em dash). Arrows: `->` and `<-`. Quotes:
+  straight `"` and `'`. Ellipsis: `...`. Math: `x`, `+/-`, `<=`, `>=`, `~`.
+  Separators: `-`, `;` or `|`. No emoji, no check-mark glyphs (use `[x]` and
+  `[ ]`), no accented letters: transliterate names and quoted text.
+- Check before saving. In a git repo,
+  `git diff -U0 -- <file> | grep -v '^+++' | grep '^+' | grep -nP '[^\x00-\x7F]'`
+  must print nothing. For a new or untracked file,
+  `grep -nP '[^\x00-\x7F]' <file>` must print nothing.
+- Leave non-ASCII in text you did not write. Earlier entries of an
+  append-only record stay byte for byte; converting an existing file is a
+  separate, explicit job.
