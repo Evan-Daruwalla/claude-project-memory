@@ -1,15 +1,10 @@
 ---
 name: project-memory
 description: >-
-  A project memory + execution-doc system: HANDOFF.md (only live snapshot) +
-  append-only record + standing PRD_ROADMAP.md + codebase-memory bins. Owns
-  the MACHINERY and three workflows: BOOTSTRAP, PRD write/execute-next-task,
-  and the codebase-memory BINS — plus templates.md, append-record-entry.js and
-  the cadence/record hooks everything else runs on. Use when: "/project-memory",
-  "bootstrap the memory system", "write a PRD", "next task", "continue the
-  roadmap", "update the bins", or in a project lacking HANDOFF.md. **Updating
-  docs — record entry, handoff, drift check — moved to /docs-sync 2026-09-09.**
-  Read templates.md before creating any doc.
+  A project-doc system: HANDOFF.md, append-only record, PRD_ROADMAP.md, bins,
+  templates, hooks. Use when: "bootstrap the memory system", "write a PRD",
+  "next task", "update the bins", or no HANDOFF.md exists. Doc updates:
+  /docs-sync.
 ---
 
 # project-memory — the doc/memory system

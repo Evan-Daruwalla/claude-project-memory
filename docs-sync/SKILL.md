@@ -1,15 +1,10 @@
 ---
 name: docs-sync
 description: >-
-  Bring every doc a project keeps back in line with what the code and the
-  session actually did — one ordered pass: record entry, HANDOFF, HTML twin,
-  record index, bins, PRD status, memory files, handoff prompt, each with its
-  own done-check. Owns three workflows ported from project-memory 2026-09-09:
-  RECORD ENTRY, HANDOFF, DRIFT-CHECK. Use when: "update the project memory",
-  "update the docs", "sync the docs", "update everything", "log this",
-  "record this", "handoff", "drift check", "is HANDOFF still true". NOT an
-  audit (/audit-docs asks whether docs are TRUE and only reports); this one
-  EDITS. Bootstrap, PRD and bins stay in /project-memory.
+  EDITS every project doc back into line with what the code and session did:
+  record entry, HANDOFF, HTML twin, index, bins, PRD, memory. Use when:
+  "update the docs", "sync the docs", "log this", "handoff", "drift check".
+  Checking truth: /audit-docs.
 ---
 
 # docs-sync — make every doc true again, in one ordered pass
