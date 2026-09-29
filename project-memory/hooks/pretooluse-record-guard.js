@@ -86,7 +86,7 @@ function isOtherRecordPath(p) {
   return typeof p === "string" && !!p && OTHER_RECORD.test(basenameOf(p));
 }
 
-// Git Bash spells absolute paths `/d/ClaudeCode/...`; existsSync on that form
+// Git Bash spells absolute paths `/d/projects/...`; existsSync on that form
 // returns false on win32, which would mis-read an EXISTING record as a new file
 // and allow the write. Same drive mapping pretooluse-commit-gate.js uses.
 function toNative(p) {
