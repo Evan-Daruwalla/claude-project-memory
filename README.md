@@ -21,7 +21,7 @@ Four artifacts, each with one job:
 | `HANDOFF.md` | The single always-current snapshot. A fresh session reads it first. |
 | `docs/<record>.md` | An **append-only** chronological build log — the ground truth. Point-in-time snapshots live inside it as dated entries. |
 | `PRD_ROADMAP.md` | A standing plan a model executes one small task at a time. |
-| `.claude/codebase-memory/` | Binned technical memory so a session loads only the facts a task needs. |
+| `.claude/project-memory/` | Binned project memory so a session loads only the facts a task needs. `important.md` holds the critical facts and is injected by a hook; every other kind of fact (decisions, people, timeline, operations, experiments, hardware, code...) has its own bin. |
 
 The design goal: a session started cold — by any model, including a cheaper
 one — can read `HANDOFF.md`, pick up the plan, and execute without the owner
@@ -40,8 +40,8 @@ skill small enough to load one section instead of the whole file.
   history (nothing invented).
 - **PRD** — write a roadmap, or execute its next open task end-to-end with the
   project's own definition of done.
-- **Codebase-memory bins** — maintain per-project technical memory that a
-  session reads selectively to save tokens.
+- **Project-memory bins** - maintain per-project memory that a session reads
+  selectively to save tokens, with `important.md` read first.
 
 `docs-sync` — the write arm:
 

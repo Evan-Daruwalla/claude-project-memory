@@ -47,7 +47,7 @@ const DEFAULTS = {
   bins: 3,
   bins_max_age_days: 21,
   drift_check: 15,
-  drift_check_days: 14,
+  drift_check_days: 7,
   _floor: 0,
   _count: 0,
   _last_fired: {},
@@ -171,10 +171,10 @@ function main() {
     "[PM-CADENCE] No cadence config existed for this project — auto-created " +
       "defaults at .claude/pm-cadence.json. All reminders are change-driven: " +
       "record_entry when files are newer than the record (once per 3 prompts); " +
-      "bins when code is newer than the codebase-memory bins OR any single bin " +
+      "bins when code is newer than the project-memory bins OR any single bin " +
       "is over 21 days old (once per 3); handoff on a long 15-prompt debounce " +
-      "since mid-session drift is normal; drift_check when HANDOFF.md has been " +
-      "untouched 14+ days AND the project moved since; prd_next_task off. Before " +
+      "since mid-session drift is normal; drift_check when the last drift check " +
+      "(.claude/drift-check.stamp) is 7+ days old AND the project moved since; prd_next_task off. Before " +
       "proceeding with the user's project-memory request, ask if they want " +
       "different numbers for any subpart, and update the file if so."
   );

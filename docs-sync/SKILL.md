@@ -16,7 +16,7 @@ whether the docs are true and reports; this one makes them true and edits.
 
 **It owns three workflows ported out of `/project-memory` on 2026-09-09**
 (RECORD ENTRY §2, HANDOFF §3, DRIFT-CHECK §4 here). `/project-memory` keeps what
-it still owns: cadence setup, BOOTSTRAP, PRD, codebase-memory bins, the
+it still owns: cadence setup, BOOTSTRAP, PRD, project-memory bins, the
 templates, and the scripts and hooks all of this runs on.
 
 **Never invent history, data, or numbers.** Unsure whether something happened →
@@ -51,7 +51,7 @@ record entry.
 | 3 | HTML twin, if the project has one | `broken: 0` |
 | 4 | Record index, if the project has one | `record-index: CURRENT — N appendices`, exit 0 |
 | 5 | HANDOFF.md (§3) | `Last updated:` stamped from a real `date`; every claim in it is currently true |
-| 6 | Bins (`/project-memory` §5) | only the bins the cadence report named as stale |
+| 6 | Bins (`/project-memory` §5) | only the bins the cadence report named as stale; important.md whenever a critical fact changed |
 | 7 | PRD status | a milestone row moves ONLY if its done-check actually passed |
 | 8 | Memory files | a durable fact changed → update the file AND its `MEMORY.md` index line |
 | 9 | Handoff prompt | fenced, paste-ready, at the end of HANDOFF.md |
@@ -165,6 +165,11 @@ HANDOFF.md's claims — NOT the skill docs, NOT a code audit (that's `/audit`).
    any fix routes through §3 (record entry + HANDOFF update), never a silent
    edit. For historical disagreements the record wins; HANDOFF is what gets
    corrected.
+6. **Stamp it**, drift or not: write today's date (from a real `date`) to
+   `<project>/.claude/drift-check.stamp`. pm-cadence keys the drift reminder
+   to this file (7-day window, only when the project moved since). Editing
+   HANDOFF does not count as a check, and skipping this step means the
+   reminder keeps firing.
 
 ---
 
@@ -190,7 +195,7 @@ HANDOFF.md's claims — NOT the skill docs, NOT a code audit (that's `/audit`).
 |---|---|
 | Set the system up in a new project | `/project-memory` §1 BOOTSTRAP |
 | Write a PRD, or execute its next task | `/project-memory` §4 |
-| Codebase-memory bins and their DIRECTORY | `/project-memory` §5 |
+| Project-memory bins (incl. important.md) and their DIRECTORY | `/project-memory` §5 |
 | Cadence hook config | `/project-memory` §0 |
 | Are the docs TRUE? (findings, no edits) | `/audit-docs` |
 | Did my change land where it executes? | `/landing-check` |

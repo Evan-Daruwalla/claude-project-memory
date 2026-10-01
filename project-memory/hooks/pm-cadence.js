@@ -58,7 +58,7 @@ const LABELS = {
   record_entry: "append a timestamped record entry",
   handoff: "run the end-of-session handoff sync",
   prd_next_task: "execute the next PRD task",
-  bins: "update the codebase-memory bins",
+  bins: "update the project-memory bins",
   drift_check: "verify HANDOFF's claims against reality — drift check",
 };
 
@@ -98,7 +98,7 @@ const DEFAULTS = {
   bins: 3,
   bins_max_age_days: 21,
   drift_check: 15,
-  drift_check_days: 14,
+  drift_check_days: 7,
   _floor: 0,
   _count: 0,
   _last_fired: {},
@@ -243,23 +243,43 @@ function findNearestFile(root, name) {
   return maxOverSubdirs(root, (d) => mtimeOf(path.join(d, name)));
 }
 
-// Locate `.claude/codebase-memory/`. Usually at the project root — but not
-// always, and the fixed-path version was silently wrong: one real project keeps its
+// Folder names for the bins, in resolution order. `project-memory` is the
+// current name; `codebase-memory` is the legacy name (renamed 2026-09-30) and is
+// kept PERMANENTLY, so projects that never migrated keep working.
+const BIN_DIR_NAMES = ["project-memory", "codebase-memory"];
+
+// Locate the bins directory. Usually at the project root — but not always,
+// and the fixed-path version was silently wrong: one real project keeps its
 // config at `<proj>/.claude/` and its bins one level down at
-// `<proj>/<subdir>/.claude/codebase-memory/` (measured 2026-09-01).
+// `<proj>/<subdir>/.claude/project-memory/` (measured 2026-09-01).
 // A missing target reads as mtime 0, so every code file looks newer — the
 // reminder would fire on every prompt and could NEVER go quiet, because
 // updating the real bins cannot move a target that does not exist.
+// Resolution order, first hit wins:
+//   1. cfg.bins_dir (string, resolved against `root`) when it is a directory;
+//      set-but-not-a-directory falls through rather than failing
+//   2. <root>/.claude/project-memory
+//   3. <root>/.claude/codebase-memory   (legacy name)
+//   4. one level of subdirectories: <sub>/.claude/project-memory, then
+//      <sub>/.claude/codebase-memory
 // Root first (one stat, the common case), then one level of subdirectories.
-function findBinsDir(root) {
-  const direct = path.join(root, ".claude", "codebase-memory");
-  if (isDir(direct)) return direct;
+function findBinsDir(root, cfg) {
+  if (cfg && typeof cfg.bins_dir === "string" && cfg.bins_dir) {
+    const custom = path.resolve(root, cfg.bins_dir);
+    if (isDir(custom)) return custom;
+  }
+  for (const name of BIN_DIR_NAMES) {
+    const direct = path.join(root, ".claude", name);
+    if (isDir(direct)) return direct;
+  }
   let ents;
   try { ents = fs.readdirSync(root, { withFileTypes: true }); } catch { return null; }
   for (const e of ents) {
     if (!e.isDirectory() || SKIP_DIRS.has(e.name) || e.name.startsWith(".")) continue;
-    const nested = path.join(root, e.name, ".claude", "codebase-memory");
-    if (isDir(nested)) return nested;
+    for (const name of BIN_DIR_NAMES) {
+      const nested = path.join(root, e.name, ".claude", name);
+      if (isDir(nested)) return nested;
+    }
   }
   return null;
 }
@@ -275,6 +295,28 @@ function findBinsDir(root) {
 //            had gotchas.md fresh and security.md 40 days old.
 // A bin that is reviewed and still accurate is kept fresh by touching it —
 // that is the intended escape from a permanent age reminder.
+// A STUB bin is exempt from both measures: a file whose first non-empty line
+// starts with "STATUS: N/A" or "STATUS: empty" marks a bin that was considered
+// and found not applicable (or empty). Nobody will ever update it, so the age
+// rule would nag about it forever. Only the first ~512 bytes are read; a file
+// that cannot be read is treated as a normal bin.
+const STUB_RE = /^STATUS: (N\/A|empty)/;
+
+function isStubBin(file) {
+  let fd;
+  try {
+    fd = fs.openSync(file, "r");
+    const buf = Buffer.alloc(512);
+    const n = fs.readSync(fd, buf, 0, 512, 0);
+    const first = buf.toString("utf8", 0, n).split(/\r?\n/).find((l) => l.trim() !== "");
+    return first !== undefined && STUB_RE.test(first);
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) { try { fs.closeSync(fd); } catch { /* ignore */ } }
+  }
+}
+
 function binsState(dir, maxAgeDays, now) {
   const out = { newest: 0, stale: [] };
   if (!dir) return out;
@@ -283,6 +325,7 @@ function binsState(dir, maxAgeDays, now) {
   const cutoff = maxAgeDays > 0 ? now - maxAgeDays * 86400000 : null;
   for (const e of ents) {
     if (!e.isFile() || !/\.md$/i.test(e.name)) continue;
+    if (isStubBin(path.join(dir, e.name))) continue;
     const m = mtimeOf(path.join(dir, e.name));
     if (m > out.newest) out.newest = m;
     if (cutoff !== null && m > 0 && m < cutoff) {
@@ -404,20 +447,22 @@ function main() {
     if (enabled.some(([k]) => k === "bins")) {
       const parsedAge = parseInt(cfg.bins_max_age_days, 10);
       const maxAge = Number.isFinite(parsedAge) ? parsedAge : DEFAULTS.bins_max_age_days;
-      bins = binsState(findBinsDir(root), maxAge, now);
+      bins = binsState(findBinsDir(root, cfg), maxAge, now);
     }
     const handoffMtime = findNearestFile(root, "HANDOFF.md");
     targets = {
       record_entry: findRecord(root),
       handoff: handoffMtime,
       bins: bins.newest,
-      // drift_check shares HANDOFF.md as its target ON PURPOSE. It could have
-      // stored "when I last asked" in the config instead, but a hook cannot
-      // verify the model actually complied, so that clock would reset on every
-      // reminder whether or not the check happened — silencing itself for
-      // `drift_check_days` on nothing. Keyed to the FILE, ignoring the reminder
-      // changes nothing and it keeps firing until HANDOFF is really touched.
-      drift_check: handoffMtime,
+      // drift_check is keyed to a FILE the check itself writes -
+      // .claude/drift-check.stamp, written by docs-sync section 4 - never to a
+      // clock this hook resets on firing (that would silence itself for
+      // `drift_check_days` whether or not the check happened). It was keyed to
+      // HANDOFF.md until 2026-09-28, but HANDOFF is edited every few days, and
+      // editing a snapshot is not verifying it, so the reminder never fired.
+      // No stamp = never checked (1, not 0: present but ancient). No HANDOFF =
+      // the project keeps no snapshot, so 0 (absent, never fires).
+      drift_check: handoffMtime ? (mtimeOf(path.join(root, ".claude", "drift-check.stamp")) || 1) : 0,
     };
     let stopAbove = 0;
     for (const [k] of enabled) {
@@ -439,7 +484,8 @@ function main() {
     const newest = key === "bins" ? scan.newestCode : scan.newestAny;
     // A target that does not exist reads as mtime 0, which would make every
     // file look newer — firing forever at a project that simply does not use
-    // that artifact (no HANDOFF.md, no codebase-memory/), with no action that
+    // that artifact (no HANDOFF.md, no project-memory/ bins dir; the legacy
+    // codebase-memory/ name still counts as present), with no action that
     // could ever silence it. Absent means "not in use here", not "infinitely
     // stale"; creating one is /project-memory §1 BOOTSTRAP's job, not a
     // per-prompt nag's.
@@ -491,7 +537,7 @@ function main() {
     }
     const items = due.map((k) => {
       const base = describe(k, ranges);
-      // name the worst offenders: "update the codebase-memory bins" alone does
+      // name the worst offenders: "update the project-memory bins" alone does
       // not say WHICH, and the whole point of the age rule is that the fresh
       // ones hide the rotten ones
       if (k !== "bins" || !bins.stale.length) return base;
@@ -609,6 +655,9 @@ function runCanary() {
     write({ _count: 0, _last_fired: {} });
     const ho = path.join(proj, "HANDOFF.md");
     fs.writeFileSync(ho, "# handoff\n");
+    // a drift check "just ran", so drift_check (keyed to this stamp, not to
+    // HANDOFF) stays out of the tests below; its own section re-stamps it
+    fs.writeFileSync(path.join(proj, ".claude", "drift-check.stamp"), "x\n");
     setM(rec, 9000); setM(src, 1000); setM(ho, 9500);
     r = fire(proj);
     check((r.stdout || "") === "", "updating HANDOFF.md does not itself demand a record entry");
@@ -675,13 +724,13 @@ function runCanary() {
 
     // --- bins: nested location, and per-bin age ------------------------------
     // bins live one level down, the real nested layout this handles
-    const nestedBins = path.join(proj, "app", ".claude", "codebase-memory");
+    const nestedBins = path.join(proj, "app", ".claude", "project-memory");
     fs.mkdirSync(nestedBins, { recursive: true });
     const freshBin = path.join(nestedBins, "gotchas.md");
     const oldBin = path.join(nestedBins, "features.md");
     fs.writeFileSync(freshBin, "x\n");
     fs.writeFileSync(oldBin, "x\n");
-    check(findBinsDir(proj) === nestedBins, "finds a codebase-memory dir one level below the root");
+    check(findBinsDir(proj) === nestedBins, "finds a project-memory dir one level below the root");
 
     const nowMs = Date.now();
     const days = (n) => new Date(nowMs - n * 86400000);
@@ -702,7 +751,7 @@ function runCanary() {
     r = fire(proj);
     check(/features\.md 40d/.test(r.stdout || ""),
       `reminder names the stale bin and its age (got: ${(r.stdout || "").slice(0, 200)})`);
-    check(/codebase-memory bins/.test(r.stdout || ""), "and still labels it as the bins subpart");
+    check(/project-memory bins/.test(r.stdout || ""), "and still labels it as the bins subpart");
 
     // a fully fresh bin set stays silent
     fs.utimesSync(oldBin, days(1), days(1));
@@ -711,6 +760,101 @@ function runCanary() {
     r = fire(proj);
     check((r.stdout || "") === "", "no stale bins and no newer code -> silent");
     fs.rmSync(path.join(proj, "app"), { recursive: true, force: true });
+
+    // --- bins dir resolution: new name, legacy name, cfg.bins_dir ------------
+    // Each case gets its own temp tree so it cannot disturb `proj`'s state.
+    const mk = (...parts) => { const d = path.join(root, ...parts); fs.mkdirSync(d, { recursive: true }); return d; };
+
+    // legacy `.claude/codebase-memory` is still found, at the root and one level down
+    const legRoot = path.join(root, "legacy-root");
+    const legBins = mk("legacy-root", ".claude", "codebase-memory");
+    check(findBinsDir(legRoot) === legBins, "legacy .claude/codebase-memory is still found at the root");
+    const legNestRoot = path.join(root, "legacy-nested");
+    const legNestBins = mk("legacy-nested", "app", ".claude", "codebase-memory");
+    check(findBinsDir(legNestRoot) === legNestBins, "legacy .claude/codebase-memory is still found one level down");
+
+    // the new name wins when both exist (root, and one level down)
+    const bothRoot = path.join(root, "both-root");
+    const bothNew = mk("both-root", ".claude", "project-memory");
+    mk("both-root", ".claude", "codebase-memory");
+    check(findBinsDir(bothRoot) === bothNew, ".claude/project-memory wins over .claude/codebase-memory at the root");
+    const bothNestRoot = path.join(root, "both-nested");
+    const bothNestNew = mk("both-nested", "app", ".claude", "project-memory");
+    mk("both-nested", "app", ".claude", "codebase-memory");
+    check(findBinsDir(bothNestRoot) === bothNestNew, "project-memory wins over codebase-memory one level down too");
+
+    // a root-level legacy dir beats a nested new-name dir (root always wins)
+    const rootWinsRoot = path.join(root, "root-wins");
+    const rootWinsBins = mk("root-wins", ".claude", "codebase-memory");
+    mk("root-wins", "app", ".claude", "project-memory");
+    check(findBinsDir(rootWinsRoot) === rootWinsBins, "a root-level bins dir wins over a nested one");
+
+    // cfg.bins_dir beats both names; a missing / non-string value falls through
+    const cfgRoot = path.join(root, "cfg-root");
+    const cfgNotes = mk("cfg-root", "docs", "notes");
+    const cfgNew = mk("cfg-root", ".claude", "project-memory");
+    mk("cfg-root", ".claude", "codebase-memory");
+    check(findBinsDir(cfgRoot, { bins_dir: "docs/notes" }) === cfgNotes, "cfg.bins_dir wins over both default names");
+    check(findBinsDir(cfgRoot, { bins_dir: "docs/missing" }) === cfgNew, "a bins_dir that does not exist falls through");
+    check(findBinsDir(cfgRoot, { bins_dir: 5 }) === cfgNew, "a non-string bins_dir falls through");
+    check(findBinsDir(cfgRoot, { bins_dir: "" }) === cfgNew, "an empty bins_dir falls through");
+    check(findBinsDir(cfgRoot, null) === cfgNew, "a null cfg is accepted");
+    check(findBinsDir(path.join(root, "no-such-dir")) === null, "no bins anywhere -> null");
+
+    // stub bins: first non-empty line "STATUS: N/A" / "STATUS: empty" is skipped
+    // by BOTH measures. Stub files mark a considered-but-N/A bin; the age rule
+    // would nag about them forever.
+    const stubDir = mk("stub-bins");
+    const nowS = Date.now();
+    const ageS = (p, n) => fs.utimesSync(p, new Date(nowS - n * 86400000), new Date(nowS - n * 86400000));
+    const stubNA = path.join(stubDir, "security.md");
+    const stubEmpty = path.join(stubDir, "performance.md");
+    const stubLead = path.join(stubDir, "ops.md");
+    const fakeStub = path.join(stubDir, "gotchas.md");
+    const normal = path.join(stubDir, "features.md");
+    fs.writeFileSync(stubNA, "STATUS: N/A (2026-01-01) - x\n");
+    fs.writeFileSync(stubEmpty, "STATUS: empty (2026-01-01)\nnothing here yet\n");
+    fs.writeFileSync(stubLead, "\n\n  \nSTATUS: N/A - leading blank lines\n");
+    fs.writeFileSync(fakeStub, "- fact\nSTATUS: N/A (not on the first line)\n");
+    fs.writeFileSync(normal, "- a real bin\n");
+    for (const p of [stubNA, stubEmpty, stubLead, fakeStub, normal]) ageS(p, 40);
+    let sb = binsState(stubDir, 21, nowS);
+    const staleNames = sb.stale.map((s) => s.name).sort();
+    check(!staleNames.includes("security.md") && !staleNames.includes("performance.md"),
+      `a stub older than the max age is NOT stale (got ${JSON.stringify(staleNames)})`);
+    check(!staleNames.includes("ops.md"), "a stub whose STATUS line follows blank lines is still a stub");
+    check(staleNames.includes("features.md"), "a normal bin older than the max age IS stale");
+    check(staleNames.includes("gotchas.md"), "a file whose first line is real content is a normal bin, not a stub");
+    check(staleNames.length === 2, `exactly the two non-stub bins are stale (got ${JSON.stringify(staleNames)})`);
+    // a fresh stub must not set `newest` either
+    fs.rmSync(fakeStub); fs.rmSync(normal);
+    ageS(stubNA, 0); ageS(stubEmpty, 0); ageS(stubLead, 0);
+    sb = binsState(stubDir, 21, nowS);
+    check(sb.newest === 0 && sb.stale.length === 0, `stubs alone: no newest, no stale (got ${JSON.stringify(sb)})`);
+    fs.writeFileSync(normal, "- a real bin\n"); ageS(normal, 3);
+    sb = binsState(stubDir, 21, nowS);
+    check(Math.abs(sb.newest - (nowS - 3 * 86400000)) < 2000, "a fresh stub does not move newest past the real bin");
+    check(binsState(stubDir, 21, nowS).stale.length === 0, "a fresh normal bin plus stubs -> nothing stale");
+
+    // whole flow: the call site passes cfg, so a bins_dir project and a legacy-named
+    // project both get the age reminder, labelled with the new name
+    const flowBins = mk("flow-cfg", "docs", "notes");
+    mk("flow-cfg", ".claude");
+    fs.writeFileSync(path.join(flowBins, "old.md"), "- x\n");
+    fs.writeFileSync(path.join(flowBins, "skip.md"), "STATUS: N/A (2026-01-01) - x\n");
+    ageS(path.join(flowBins, "old.md"), 40); ageS(path.join(flowBins, "skip.md"), 90);
+    const flowCfg = (dir, extra) => fs.writeFileSync(path.join(root, dir, ".claude", "pm-cadence.json"),
+      JSON.stringify({ ...DEFAULTS, record_entry: 0, handoff: 0, drift_check: 0, bins: 1, ...extra }));
+    flowCfg("flow-cfg", { bins_dir: "docs/notes" });
+    r = fire(path.join(root, "flow-cfg"));
+    check(/old\.md 40d/.test(r.stdout || "") && /project-memory bins/.test(r.stdout || ""),
+      `bins_dir bin is checked end to end (got: ${(r.stdout || "").slice(0, 160)})`);
+    check(!/skip\.md/.test(r.stdout || ""), "the stub in that dir is never named in a reminder");
+    const flowLeg = mk("flow-legacy", ".claude", "codebase-memory");
+    fs.writeFileSync(path.join(flowLeg, "old.md"), "- x\n"); ageS(path.join(flowLeg, "old.md"), 40);
+    flowCfg("flow-legacy", {});
+    r = fire(path.join(root, "flow-legacy"));
+    check(/old\.md 40d/.test(r.stdout || ""), "a legacy-named bins dir is checked end to end");
 
     // --- nested layout: HANDOFF and the record found one level down ----------
     // A real project's shape: record at the root, HANDOFF.md inside a subdir,
@@ -732,58 +876,71 @@ function runCanary() {
       "a root HANDOFF.md wins even when a newer one sits in a subdirectory");
     fs.rmSync(nestRoot, { recursive: true, force: true });
 
-    // --- drift_check: handoff's stricter sibling -----------------------------
+    // --- drift_check: keyed to the last CHECK, not the last HANDOFF edit ------
+    // (2026-09-28) Keyed to HANDOFF's mtime it never fired: HANDOFF is edited
+    // every 1-3 days, so "untouched 14 days" never held, and stale OPEN items
+    // sat unverified. Editing HANDOFF is not verifying it. The target is now the
+    // stamp that docs-sync section 4 writes when a drift check actually runs.
     const ho2 = path.join(proj, "HANDOFF.md");
+    const stamp = path.join(proj, ".claude", "drift-check.stamp");
     fs.writeFileSync(ho2, "# handoff\n");
     const dayAgo = (n) => new Date(Date.now() - n * 86400000);
+    const dw = (o) => write({ record_entry: 0, handoff: 0, bins: 0, drift_check: 1, drift_check_days: 7,
+                              _count: 0, _last_fired: {}, ...o });
+    const stampAt = (n) => { fs.writeFileSync(stamp, "x\n"); fs.utimesSync(stamp, dayAgo(n), dayAgo(n)); };
 
-    // recently-synced HANDOFF + newer source: handoff fires, drift_check does NOT
-    write({ record_entry: 0, handoff: 1, bins: 0, drift_check: 1, drift_check_days: 14,
-            _count: 0, _last_fired: {} });
+    check(DEFAULTS.drift_check_days === 7, "the default window is 7 days");
+
+    // a recent drift check + newer source: handoff fires, drift_check does NOT
+    dw({ handoff: 1 }); stampAt(2);
     fs.utimesSync(ho2, dayAgo(2), dayAgo(2));
     fs.utimesSync(src, dayAgo(1), dayAgo(1));
     r = fire(proj);
     check(/handoff sync/.test(r.stdout || ""), "handoff fires when source is newer than HANDOFF.md");
-    check(!/drift check/.test(r.stdout || ""),
-      "drift_check stays quiet on a recently-synced HANDOFF (not a duplicate handoff nag)");
+    check(!/drift check/.test(r.stdout || ""), "drift_check stays quiet after a recent drift check");
 
-    // same drift, but HANDOFF untouched for longer than drift_check_days
-    write({ record_entry: 0, handoff: 0, bins: 0, drift_check: 1, drift_check_days: 14,
-            _count: 0, _last_fired: {} });
-    fs.utimesSync(ho2, dayAgo(30), dayAgo(30));
-    fs.utimesSync(src, dayAgo(1), dayAgo(1));
+    // the last check is older than the window and source moved since: fires
+    dw({}); stampAt(10);
     r = fire(proj);
-    check(/drift check/.test(r.stdout || ""), "drift_check fires once HANDOFF is older than drift_check_days");
-    check(/SKILL\.md:\d+-\d+/.test(r.stdout || ""), "and cites §6's line range");
+    check(/drift check/.test(r.stdout || ""), "drift_check fires once the last check is older than the window");
+    check(/SKILL\.md:\d+-\d+/.test(r.stdout || ""), "and cites the section's line range");
 
-    // old HANDOFF but a dormant project: nothing changed since, so nothing to verify
-    write({ record_entry: 0, handoff: 0, bins: 0, drift_check: 1, drift_check_days: 14,
-            _count: 0, _last_fired: {} });
-    fs.utimesSync(src, dayAgo(40), dayAgo(40));
+    // no stamp = never checked; a freshly edited HANDOFF does NOT count as a check
+    dw({}); fs.rmSync(stamp);
+    fs.utimesSync(ho2, dayAgo(0), dayAgo(0));
     r = fire(proj);
-    check((r.stdout || "") === "", "a dormant project does not drift — old HANDOFF alone is not enough");
+    check(/drift check/.test(r.stdout || ""), "editing HANDOFF is not a drift check: no stamp still fires");
 
-    // firing must NOT silence it: the target is the FILE, not a written-back clock
-    write({ record_entry: 0, handoff: 0, bins: 0, drift_check: 1, drift_check_days: 14,
-            _count: 0, _last_fired: {} });
+    // old check but a dormant project: nothing changed since, so nothing to verify
+    dw({}); stampAt(40);
+    fs.utimesSync(src, dayAgo(50), dayAgo(50));
+    r = fire(proj);
+    check((r.stdout || "") === "", "a dormant project does not drift - an old check alone is not enough");
+
+    // firing must NOT silence it: only the stamp the check writes clears it
+    dw({}); stampAt(10);
     fs.utimesSync(src, dayAgo(1), dayAgo(1));
     fire(proj);
     r = fire(proj);
     check(/drift check/.test(r.stdout || ""), "ignoring a drift reminder does not silence it");
-    fs.utimesSync(ho2, dayAgo(0), dayAgo(0));   // actually do the check
-    write({ record_entry: 0, handoff: 0, bins: 0, drift_check: 1, drift_check_days: 14,
-            _count: 0, _last_fired: {} });
+    stampAt(0);                                  // actually do the check
+    dw({});
     r = fire(proj);
-    check((r.stdout || "") === "", "touching HANDOFF clears it");
+    check((r.stdout || "") === "", "writing the stamp clears it");
+
+    // no HANDOFF = the project does not use the snapshot: never fires
+    fs.rmSync(ho2); fs.rmSync(stamp);
+    dw({});
+    r = fire(proj);
+    check(!/drift check/.test(r.stdout || ""), "no HANDOFF.md, no drift reminder");
+    fs.writeFileSync(ho2, "# handoff\n");
 
     check(/^\s*$/.test((() => {
-      write({ record_entry: 0, handoff: 0, bins: 0, drift_check: 1, drift_check_days: 0,
-              _count: 0, _last_fired: {} });
-      fs.utimesSync(ho2, dayAgo(30), dayAgo(30));
+      dw({ drift_check_days: 0 }); stampAt(30);
       fs.utimesSync(src, dayAgo(1), dayAgo(1));
       return fire(proj).stdout || "";
     })()), "drift_check_days 0 disables the subpart");
-    fs.rmSync(ho2);
+    fs.rmSync(ho2); fs.rmSync(stamp);
 
     // --- line-range nudge ---------------------------------------------------
     write({ _count: 0, _last_fired: {} });
@@ -840,5 +997,11 @@ function runCanary() {
   }
 }
 
-if (process.argv.includes("--canary")) process.exit(runCanary() ? 0 : 1);
-process.exit(main());
+// Run as a script: hook or --canary. Required as a module (important-inject.js
+// reuses the finders): export them and run nothing.
+if (require.main === module) {
+  if (process.argv.includes("--canary")) process.exit(runCanary() ? 0 : 1);
+  process.exit(main());
+}
+
+module.exports = { findConfig, findBinsDir, binsState };

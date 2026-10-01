@@ -22,7 +22,7 @@ some projects' records use `## YYYY-MM-DD — title` entries instead of
 | `HANDOFF.md` | The only live snapshot; a fresh session reads it FIRST | Rewritten freely; keep it a snapshot, move history to the record |
 | `docs/Project Record - Full Chronological History.md` for a new project (ASCII name; an existing record keeps the name it has) (or `docs/record_<date>.md`) | Append-only chronological build log — the ground truth; when anything disagrees with it, the record wins. Point-in-time snapshots live INSIDE it as dated entries | APPEND-ONLY; front-matter TOC gets one new line per entry; prior entries never edited |
 | `PRD_ROADMAP.md` | Standing plan a model executes task-by-task | Grows by APPEND; never wholesale-deleted/retyped. Removed steps are struck through in place (kept + dated); a new direction is a dated FORK marked as the current plan (see §4) |
-| `.claude/codebase-memory/` | Binned technical memory (see §5) | Superseded in place, same session as the code change |
+| `.claude/project-memory/` | Binned project memory (see section 5); `important.md` is read first | Superseded in place, same session as the code change |
 
 Explicitly OUTSIDE this system: project-specific artifacts such as a
 `daily_report.md` / `rebalance_log.md` (they have their own rules) — never fold them in.
@@ -82,7 +82,7 @@ remembering to check:
   `record_entry`, which is why one project's `conventions.md` went stale
   unnoticed; that default was only rational while enabling a subpart meant
   nagging every N prompts regardless of need. Three fixes made it safe:
-  `bins` finds `codebase-memory/` by bounded search (root, then one level down
+  `bins` finds the bins folder by bounded search (root, then one level down
   — one real project keeps its config at the root and its bins one level down,
   which a fixed path missed entirely); `bins_max_age_days` (21) flags an
   individual rotting bin even when a sibling is fresh, since taking only the
@@ -115,8 +115,8 @@ ever reads this section. The model's only remaining job:
 - **If the injected context says a config was just auto-created** (tagged
   `_auto_created: true` in the file, or you see the `[PM-CADENCE] ... auto-
   created defaults` note): ask, in ONE question, whether the user wants
-  different numbers than the defaults (record_entry 3; handoff/prd_next_task/
-  bins 0 = event-driven), then update `.claude/pm-cadence.json` if they do and
+  different numbers than the defaults (record_entry 3; handoff 15;
+  bins 3; prd_next_task 0 = event-driven), then update `.claude/pm-cadence.json` if they do and
   drop the `_auto_created` flag.
 - **Otherwise**: config already exists (auto-created earlier or hand-set) —
   don't re-ask, just proceed with the requested workflow.
@@ -154,7 +154,7 @@ ever reads this section. The model's only remaining job:
      `HANDOFF.md` with N as the debounce (default: session end only, i.e. 0).
    - **PRD next-task** (§4) — on request, or as the default idle action
      (default: on request).
-   - **Codebase-memory bins** (§5) — same session as any code change that
+   - **Project-memory bins** (section 5) — same session as any code change that
      alters a stored fact (default: on fact-change only; not prompt-timed).
    These are SOFT instructions the model self-enforces, not hooks — if a count
    slips, catch up next prompt and note the miss in the record. If the user
@@ -241,84 +241,122 @@ record ("the process is the product"):
    then "next task: <id> — <one line>" so the owner can say "go".
 One task per invocation. A blocked task honestly reported beats a fudged one.
 
-## 5. CODEBASE-MEMORY BINS (`.claude/codebase-memory/`)
+## 5. PROJECT-MEMORY BINS (`.claude/project-memory/`)
 
-Binned technical memory so future sessions write correct code without
-re-reading the codebase — and without loading everything.
+Binned project memory: the durable facts a future session needs to work on a
+project correctly, without re-reading it and without loading everything.
+Renamed from "codebase-memory bins" on 2026-09-30: the projects hold
+far more than code - schedules, people, money, rules, experiments, hardware.
 
-- **Per-project isolation.** Each project's bins live in ITS
-  `.claude/codebase-memory/`; facts never leak between projects. No dir yet →
-  offer to bootstrap a fresh one, never reuse another project's.
-- **Structure**: `INDEX.md` (≤25 lines: one line per bin — name, scope,
-  last-updated — plus cross-bin invariants short enough to always load) + one
-  file per bin. **Core bins**: `security.md`, `performance.md`,
-  `architecture.md`, `features.md`, `conventions.md`, `gotchas.md`.
-  **Standards bins** — one per standard the codebase actually commits to, so a
-  future session honors the same choices instead of guessing:
-  `dependencies.md` (libraries/frameworks + pinned versions + why each + what
-  NOT to add), `ui.md` (**UI + UX design** — visual/design language,
-  component/styling/motion/a11y standards, AND UX: user flows, interaction
-  patterns, information architecture, empty/error/loading states — frontend
-  only), `testing.md` (framework, test layout, what must
-  be covered, frozen-test rules), `data.md` (schema/migration conventions,
-  API/interface contracts), `tooling.md` (build/lint/format/CI + required
-  commands), `disclosure.md` (**what may leave this project** — who the
-  non-code stakeholders are, what a case study / screenshot / demo / public
-  README may and may not show, and any standing external constraint on
-  outward-facing work).
-  (Live case: a project holding MINORS' data, which constrains what any
-  screenshot, demo, or portfolio case study may show long after the code is
-  frozen — a rule `security.md` does not cover and the record does not
-  surface at the moment the case study gets written.) *Boundary vs
-  `security.md`: security.md governs the CODEBASE (secrets, auth, input
-  handling) and its failure is a breach;
-  disclosure.md governs ARTIFACTS DERIVED from the project that go outside it,
-  and its failure is publishing something that should never have left.*
-  **Bootstrap creates the FULL set (core + standards), not opt-in**:
-  a bin with no facts yet — or a standard this project doesn't hold — gets a
-  ONE-LINE dated stub (`ui.md — N/A, no frontend (2026-…)`; `performance.md —
-  empty, no perf work yet (2026-…)`), NEVER omitted. Why: every standard gets
-  one obvious home, so facts stop scattering into other bins, and the stub
-  records that the standard was considered. Replace the stub with real facts
-  the moment they exist. (The owner's stated preference: an empty bin beats a
-  fact scattered across three other bins.)
-- **New bins on demand — specific, never a catch-all.** The core + standards
-  set is the baseline, not a ceiling. When a durable fact fits none of the
-  existing bins, CREATE A NEW bin named for its specific domain (e.g.
-  `mcp-setup.md`, `deployment.md`) and add its line to INDEX — never a
-  `misc`/`other`/`general` catch-all, and never force the fact into an
-  ill-fitting bin. The name must describe a specific domain; if you can't name
-  it specifically, the fact belongs in an existing bin. Keeps "one obvious
-  home" true as the project grows.
-- **What goes in**: only facts expensive to rediscover or dangerous to forget —
-  invariants, protocols, decisions with reasons, measured results, constraints.
-  NOT what grep answers instantly, NOT session narrative (that's the record's
-  job). One fact per line/short block, absolute dates, nothing invented;
-  inference marked "(inferred, unverified)".
-- **Read protocol** (the token saver): before writing code, read INDEX.md then
-  ONLY the bins the task touches. Input/auth/secrets/rendering ALWAYS loads
-  security.md; hot paths always load performance.md. Never all bins by
-  default. Bin facts are claims: when code disagrees, trust the code, fix the
-  bin, note the correction.
-  **The protocol is not code-only.** Any task whose OUTPUT LEAVES THE PROJECT —
-  a case study, portfolio or resume entry, demo, screenshot, public README,
-  marketing or outreach copy — ALWAYS loads `disclosure.md`, the same way
-  security.md is always loaded for auth work. This is the one bin a non-code
-  task must read: without it such a task loads NO bins at all, which is how a
-  constraint that was correctly recorded still gets violated at publish time.
-- **Write protocol** (staleness is the failure mode): any change that alters a
-  fact updates that bin the SAME session. Supersede in place ("(supersedes
-  2026-06-30 entry: X)" when history matters). Cap ~150 lines/bin — compress
-  oldest, least load-bearing first. Never delete a security/invariant entry
-  without telling the user.
-- **Bootstrap mode**: scan entry points/config/docs/ADRs/tests, populate
-  verified high-value facts only (10 load-bearing beats 50 trivia), harvest
-  decisions from HANDOFF/record/ADRs citing the source file, and present
-  INDEX to the user for correction before treating it as truth.
+- **Location.** `<project>/.claude/project-memory/`. The hooks resolve it in
+  this order: `bins_dir` in the project's `.claude/pm-cadence.json` (for a
+  project that keeps its bins elsewhere, e.g. `docs/notes`), then
+  `.claude/project-memory/`, then the legacy `.claude/codebase-memory/` (still
+  found, so an unmigrated project never goes silent); root first, then one
+  level down.
+- **Per-project isolation.** Each project's bins live in ITS folder; facts
+  never leak between projects. No folder yet -> offer to bootstrap a fresh
+  one, never reuse another project's.
+- **`important.md` - mandatory, read first.** The project's most critical
+  facts: anything that, if a session gets it wrong, causes irreversible or
+  expensive damage (money, live trading, data loss, public exposure, minors'
+  data, record or history corruption), invalidates results (frozen tests,
+  preregistration, held-out data), or is a live external constraint (a
+  deadline inside ~30 days, a BLOCKED-ON-OWNER item, a do-not-touch rule).
+  - Format: numbered entries, dated, newest last.
+    Each says WHAT it is, what it CONSTRAINS, WHY it matters, and its SOURCE
+    (`file:line` or record letter). Keep entries short; push detail into the
+    topic bin and leave a one-line pointer.
+  - The `important-inject` hook injects it the first time a session touches
+    the project, and again after compaction (cap 200 lines / 16000 chars).
+    CLAUDE.md wins on conflict. A newly learned critical fact goes in the
+    SAME session. Never remove an entry without telling the user.
+- **`INDEX.md`** (<=75 lines): the router - one line per bin (name, scope,
+  last updated; stubs marked), plus cross-bin invariants short enough to
+  always load. Its first bin line is `important.md`.
+- **The standard set - every project gets every bin.** A bin that does not
+  apply is a STUB FILE, never omitted, so each kind of fact has exactly one
+  obvious home and a stub records that the topic was considered.
+  - Knowledge (any project): `important.md`; `decisions.md` (the STANDING
+    decisions: date, reason, who decided - the append-only log stays in the
+    record or DECISIONS.md); `gotchas.md`; `people.md` (roles, who decides
+    and reviews, collaborators, orgs - contact channel only, never personal
+    contact details, minors by role only); `timeline.md` (absolute-dated
+    deadlines, venues, competitions, go/no-go dates, quiet windows,
+    expiries); `glossary.md` (project terms that are easy to confuse);
+    `compliance.md` (laws, school and competition rules, age limits,
+    licenses, consent); `budget.md` (spend limits, purchase approval,
+    recurring costs); `disclosure.md`.
+  - Running systems: `operations.md` (scheduled jobs, deploy and hosting,
+    backups and restore, monitoring, runbooks); `services.md` (external
+    accounts, APIs, quotas - credential NAMES and where each is stored,
+    NEVER values).
+  - Output: `experiments.md` (hypotheses, preregistrations, results, and
+    what has been ruled out, with evidence pointers); `writing.md` (venue
+    formats, style and voice rules, citation rules, submission status).
+  - Physical: `hardware.md` (parts and BOM pointers, wiring, CAD,
+    tolerances, purchase gating).
+  - Code: `architecture.md`, `conventions.md`, `dependencies.md` (libraries
+    and pinned versions + why + what NOT to add; also other workspace
+    projects this one reads from), `testing.md` (framework, layout, coverage,
+    frozen-test rules), `tooling.md` (build/lint/format/CI + required
+    commands), `data.md` (schema/migration conventions, API/interface
+    contracts), `security.md`, `features.md`, `performance.md`, `ui.md` (UI +
+    UX: design language, components, motion, a11y, flows, empty/error/loading
+    states).
+  - Existing project-specific bins stay (e.g. `consent.md`, `steering.md`).
+  - (Live case: a project holding MINORS' data, which constrains what any
+    screenshot, demo, or portfolio case study may show long after the code is
+    frozen - a rule `security.md` does not cover.) *Boundaries:* security.md
+    governs the CODEBASE (secrets, auth, input) and its failure is a breach;
+    disclosure.md governs ARTIFACTS that leave the project and its failure is
+    publishing what should not have left; compliance.md holds the external
+    RULES the project must obey; decisions.md holds what is decided NOW, the
+    record holds how it got there.
+- **Stub format** (a hook keys on it). The first line is exactly
+  `STATUS: N/A (<YYYY-MM-DD>) - <why it does not apply>` or
+  `STATUS: empty (<YYYY-MM-DD>) - <why nothing yet; if the facts live
+  elsewhere today, say where>`. The pm-cadence age rule skips stubs (they
+  would otherwise nag forever); replacing the STATUS line with real facts
+  ends the exemption. An empty stub that points at facts elsewhere is a
+  migration debt: move them the next time that area is touched.
+- **New bins on demand - specific, never a catch-all.** The standard set is
+  the baseline, not a ceiling. When a durable fact fits none of the bins,
+  CREATE a bin named for its specific domain (e.g. `mcp-setup.md`) and add
+  its line to INDEX - never `misc`/`other`/`general`, and never force a fact
+  into an ill-fitting bin. If you cannot name the domain specifically, the
+  fact belongs in an existing bin.
+- **What goes in**: only facts expensive to rediscover or dangerous to forget
+  - invariants, protocols, decisions with reasons, measured results,
+  constraints. NOT what grep answers instantly, NOT session narrative (that
+  is the record's job). One fact per line/short block, absolute dates,
+  nothing invented; inference marked "(inferred, unverified)".
+- **Read protocol** (the token saver): `important.md` first (the hook usually
+  injected it), then INDEX.md, then ONLY the bins the task touches - never
+  all bins by default. Always load: `security.md` for input/auth/secrets/
+  rendering; `performance.md` for hot paths; `disclosure.md` for any output
+  that LEAVES the project (case study, portfolio, demo, screenshot, public
+  README, outreach); `compliance.md` for anything touching minors, consent,
+  or school/competition rules; `operations.md` before touching a scheduled
+  job, deploy or backup; `budget.md` before any purchase. Bin facts are
+  claims: when the project disagrees, trust the project, fix the bin, note
+  the correction.
+- **Write protocol** (staleness is the failure mode): any change that alters
+  a fact updates that bin the SAME session. Supersede in place ("(supersedes
+  2026-06-30 entry: X)" when history matters). Cap ~150 lines/bin - compress
+  oldest, least load-bearing first. Never delete a security/invariant/
+  important entry without telling the user.
+- **Bootstrap mode**: create the FULL set (stubs for what does not apply),
+  scan entry points/config/docs/ADRs/tests, populate verified high-value
+  facts only (10 load-bearing beats 50 trivia), harvest decisions from
+  HANDOFF/record/ADRs citing the source file, write `important.md` from the
+  project's CLAUDE.md hard rules and HANDOFF open risks, and present INDEX
+  plus important.md to the user for correction before treating them as
+  truth.
 - **Precedence**: CLAUDE.md/HANDOFF override bin contents on conflict. Bins
   govern memory mechanics, never how the owner wants code written.
 
-### 5.1 The codebase DIRECTORY (`.claude/codebase-memory/DIRECTORY.md`)
+### 5.1 The DIRECTORY map (`.claude/project-memory/DIRECTORY.md`)
 
 A **map of the tree**, not a bin of facts: what each module IS, what the entry
 points are, which modules are load-bearing, and what nothing imports. Bins
@@ -414,11 +452,13 @@ its canary asserts it.
 
 `node hooks/pm-cadence-autoinit.js --canary` — MUST print `CANARY PASS 11/11` before you trust a result.
 
-`node hooks/pm-cadence.js --canary` — MUST print `CANARY PASS 54/54` before you trust a result.
+`node hooks/pm-cadence.js --canary` - MUST print `CANARY PASS 79/79` before you trust a result.
 
 `node hooks/pretooluse-record-guard.js --canary` — MUST print `CANARY PASS 23/23` before you trust a result.
 
 `node hooks/pretooluse-ascii-md.js --canary` - MUST print `CANARY PASS 18/18` before you trust a result.
+
+`node hooks/important-inject.js --canary` - MUST print `CANARY PASS 41/41` before you trust a result.
 
 ## ASCII-only markdown (rule added 2026-09-23)
 

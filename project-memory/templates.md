@@ -199,34 +199,83 @@ REMOVE by striking through in place with a dated reason (`~~task~~ (dropped
 exactly one fork current at a time. Status ticks update in place; planned work
 is only struck, never erased.
 
-## §4 codebase-memory bins
+## §4 project-memory bins
 
-`INDEX.md` (≤25 lines):
+`INDEX.md` (<=75 lines; the standard set is SKILL section 5):
 
 ```markdown
-# codebase-memory index - <project>
+# project-memory index - <project>
 
-Core bins:
-- security.md - <one-line scope> (updated <YYYY-MM-DD>)
-- performance.md - <scope> (updated <YYYY-MM-DD>)
-- architecture.md - <scope> (updated <YYYY-MM-DD>)
-- features.md - <scope> (updated <YYYY-MM-DD>)
-- conventions.md - <scope> (updated <YYYY-MM-DD>)
+Read first: important.md - <N> critical entries (updated <YYYY-MM-DD>)
+
+Knowledge:
+- decisions.md - standing decisions + reason + who decided (updated <YYYY-MM-DD>)
 - gotchas.md - <scope> (updated <YYYY-MM-DD>)
+- people.md - roles, deciders, collaborators, orgs (updated <YYYY-MM-DD>)
+- timeline.md - dated deadlines, windows, expiries (updated <YYYY-MM-DD>)
+- glossary.md - easily confused terms (updated <YYYY-MM-DD>)
+- compliance.md - laws, school/competition rules, age, licenses, consent (updated <YYYY-MM-DD>)
+- budget.md - spend limits, purchase approval, recurring costs (updated <YYYY-MM-DD>)
+- disclosure.md - what may leave the project (updated <YYYY-MM-DD>)
 
-Standards bins (only those the codebase actually commits to):
-- dependencies.md - libraries/frameworks + pinned versions + why (updated <YYYY-MM-DD>)
-- ui.md - UI + UX: design language / component / styling / motion / a11y + UX flows / IA / states (updated <YYYY-MM-DD>)
-- testing.md - framework, test layout, coverage/frozen rules (updated <YYYY-MM-DD>)
-- data.md - schema/migration + API/interface contracts (updated <YYYY-MM-DD>)
+Running systems:
+- operations.md - scheduled jobs, deploy/hosting, backups, monitoring, runbooks (updated <YYYY-MM-DD>)
+- services.md - external accounts/APIs/quotas; credential NAMES + where stored (updated <YYYY-MM-DD>)
+
+Output:
+- experiments.md - hypotheses, preregs, results, ruled out (updated <YYYY-MM-DD>)
+- writing.md - venues, style/voice, citations, submission status (updated <YYYY-MM-DD>)
+
+Physical:
+- hardware.md - parts/BOM, wiring, CAD, purchase gating (updated <YYYY-MM-DD>)
+
+Code:
+- architecture.md - <scope> (updated <YYYY-MM-DD>)
+- conventions.md - <scope> (updated <YYYY-MM-DD>)
+- dependencies.md - libraries + versions + why; other projects read from (updated <YYYY-MM-DD>)
+- testing.md - framework, layout, coverage/frozen rules (updated <YYYY-MM-DD>)
 - tooling.md - build/lint/format/CI + required commands (updated <YYYY-MM-DD>)
-- disclosure.md - what may leave the project: non-code stakeholders, what a case study / screenshot / demo / public README may show (updated <YYYY-MM-DD>)
+- data.md - schema/migration + API/interface contracts (updated <YYYY-MM-DD>)
+- security.md - <scope> (updated <YYYY-MM-DD>)
+- features.md - <scope> (updated <YYYY-MM-DD>)
+- performance.md - <scope> (updated <YYYY-MM-DD>)
+- ui.md - UI + UX (updated <YYYY-MM-DD>)
+
+Project-specific bins:
+- <name>.md - <scope> (updated <YYYY-MM-DD>)
+
+Stubs (first line STATUS: N/A or empty): <bin names>
 
 Map (not a bin - see SKILL section 5.1):
 - DIRECTORY.md - tree map + entry points + spine + unreferenced (reflects <sha>, <YYYY-MM-DD>)
 
 Cross-bin invariants:
 - <only ones short enough to always load>
+```
+
+`important.md` (read first; injected by the important-inject hook):
+
+```markdown
+# important - <project>
+
+> Critical facts: getting one wrong is irreversible or expensive, invalidates
+> results, or breaks a live external constraint. Numbered, dated, newest last.
+> CLAUDE.md wins on conflict. Never remove an entry without telling the user.
+> Keep entries short; detail lives in the topic bin. ASCII only.
+
+## 1. <short title> (<YYYY-MM-DD>)
+**What:** <the rule or fact - exact numbers, names, paths>
+**Constrains:** <what work must do, or never do, because of it>
+**Why:** <the cost of getting it wrong>
+**Source:** <file:line or record letter>; detail in <bin>.md
+```
+
+A stub (a bin that does not apply, or has no facts yet) - the FIRST line is
+exactly one of:
+
+```markdown
+STATUS: N/A (<YYYY-MM-DD>) - <why this topic does not apply here>
+STATUS: empty (<YYYY-MM-DD>) - <why nothing yet; facts currently in <file>:<section>, move them here when next touched>
 ```
 
 `DIRECTORY.md` — only for a codebase big enough that the tree is not obvious
@@ -269,12 +318,15 @@ Derived by: `<the exact command>`
      unreferenced are mechanically derived - regenerate, do not hand-edit. -->
 ```
 
-Bootstrap the FULL set (core + standards), not opt-in. A standard this project
-doesn't hold gets a one-line dated N/A stub, never omitted — e.g.
-`ui.md — N/A, no frontend (2026-07-15)` — so every standard has one home and
-facts never scatter. Replace the stub with real facts the moment they exist. Beyond this baseline, add a new SPECIFICALLY-NAMED bin whenever a durable fact fits none of the existing bins (name it for its domain, index it) — never a `misc`/`other` catch-all (see SKILL §5 'New bins on demand').
-Same entry rules as the core bins.
+Bootstrap the FULL standard set (SKILL section 5), not opt-in. A bin that does
+not apply is a stub whose first line is the STATUS line above, never omitted:
+every kind of fact has one obvious home, the stub records that the topic was
+considered, and the pm-cadence age rule skips stubs. Replace the STATUS line
+with real facts the moment they exist. Beyond the standard set, add a new
+SPECIFICALLY-NAMED bin whenever a durable fact fits none of them (name it for
+its domain, index it) - never a `misc`/`other` catch-all (see SKILL section 5,
+'New bins on demand').
 
-Bin entries: one fact per line/short block · absolute dates · supersede in
-place ("(supersedes <date> entry: X)") · "(inferred, unverified)" where not
-verified in code.
+Bin entries: one fact per line/short block - absolute dates - supersede in
+place ("(supersedes <date> entry: X)") - "(inferred, unverified)" where not
+verified.
