@@ -10,8 +10,10 @@
 # INSTALL IN A FRESH CLONE:
 #   git config core.hooksPath scripts/git-hooks
 #
-# Two independent gates run. Each fails CLOSED on a finding and NOISILY
-# open if it cannot run — a gate that skips silently is a dead gate.
+# Two independent gates run. Each fails CLOSED on a finding. If one cannot
+# run, the secret gate fails NOISILY open (a fresh clone has no scanner) and
+# the leak-guard, once configured, fails CLOSED — a gate that skips silently
+# is a dead gate.
 
 REPO=$(git rev-parse --show-toplevel)
 
@@ -60,8 +62,14 @@ if [ -z "$LEAKGUARD" ]; then
   # workspace to leak, so this is correct rather than degraded.
   echo "commit-gate NOTICE: leakguard.path not configured — private-identifier gate SKIPPED (not applicable outside the origin machine)." >&2
 elif [ ! -f "$LEAKGUARD" ]; then
-  echo "commit-gate WARNING: leakguard.path is set to '$LEAKGUARD' but no file is there —" >&2
-  echo "private-identifier gate SKIPPED (fail-open). Fix the path or unset the config." >&2
+  # FAIL CLOSED. The path is configured, so this is the origin machine, and a
+  # guard that has gone missing would let a diff through that it never read -
+  # the same rule as the crash branch below.
+  echo "" >&2
+  echo "commit-gate: leakguard.path is set to '$LEAKGUARD' but no file is there — commit BLOCKED." >&2
+  echo "Fix the path, unset the config if this is not the origin machine, or" >&2
+  echo "override deliberately with: git commit --no-verify" >&2
+  exit 1
 else
   node "$LEAKGUARD" --staged "$REPO"
   lstatus=$?
