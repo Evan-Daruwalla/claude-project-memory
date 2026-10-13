@@ -461,7 +461,11 @@ a machine-wide hook, a shared policy) gets copied, and the copies drift.
   2 registry error.
 - **Changing a hub fact:** edit the owner first, run the checker, fix every
   DRIFT it lists, run it again until it exits 0.
-- `node hub-check.js --canary` - MUST print `CANARY PASS 14/14`.
+- **History in append-only docs:** a document that keeps an old statement and
+  adds a dated correction marks the old line with the registry's
+  `historyMarker` (e.g. `<!-- hub: history -->` at the end of the line); the
+  checker then treats that line as history, not a copy.
+- `node hub-check.js --canary` - MUST print `CANARY PASS 15/15`.
 
 ## Rules (all workflows)
 

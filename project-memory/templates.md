@@ -341,6 +341,7 @@ verified.
   "skipDirs": ["node_modules", ".git", ".venv", "archive"],
   "skipPaths": ["Project Record", "/docs/audits/"],
   "extensions": [".md"],
+  "historyMarker": "<!-- hub: history -->",
   "facts": [
     { "id": "<kebab-id>", "owner": "<hub file>", "kind": "value",
       "pattern": "<regex; group 1 captures the value>", "expect": "<value>" },

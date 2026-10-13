@@ -19,7 +19,8 @@
  *
  * Exit codes: 0 = clean, 1 = drift found, 2 = usage or registry error.
  *
- * Registry (JSON). All keys are required except skipPaths and extensions:
+ * Registry (JSON). All keys are required except skipPaths, extensions and
+ * historyMarker:
  *   {
  *     "roots":      ["<dir or file>", ...],  a leading "~" is the home directory;
  *                                            a missing root is a registry error
@@ -28,6 +29,13 @@
  *                                            whose forward-slash path contains
  *                                            one of these is skipped
  *     "extensions": [".md"],                 default [".md"]; case-insensitive
+ *     "historyMarker": "<!-- hub: history -->",  optional non-empty string;
+ *                                            append-only documents keep an old
+ *                                            statement and add a dated
+ *                                            correction. A COPY line containing
+ *                                            this text (case-sensitive) is
+ *                                            history, not a live copy: ignored
+ *                                            for every fact. Owners unchanged.
  *     "facts": [
  *       { "id": "team-size",                 unique
  *         "owner": "<path>",                 the hub file; "~" expands
@@ -111,6 +119,13 @@ function loadRegistry(file) {
   const skipDirs = strList("skipDirs", null);
   const skipPaths = strList("skipPaths", []);
   const extensions = strList("extensions", [".md"]).map((e) => e.toLowerCase());
+  let historyMarker = null;
+  if (j.historyMarker !== undefined) {
+    if (typeof j.historyMarker !== "string" || j.historyMarker === "") {
+      throw new RegistryError("historyMarker must be a non-empty string");
+    }
+    historyMarker = j.historyMarker;
+  }
   for (const r of roots) {
     if (!fs.existsSync(r)) throw new RegistryError(`root does not exist: ${toSlash(r)}`);
   }
@@ -158,7 +173,7 @@ function loadRegistry(file) {
     };
   });
 
-  return { roots, skipDirs, skipPaths, extensions, facts };
+  return { roots, skipDirs, skipPaths, extensions, historyMarker, facts };
 }
 
 // -------------------------------------------------------------------- walk
@@ -258,6 +273,7 @@ function runCheck(reg) {
     for (const ent of entries) {
       if (ent.key === ownerKey) continue;
       for (let i = 0; i < ent.lines.length; i++) {
+        if (reg.historyMarker !== null && ent.lines[i].includes(reg.historyMarker)) continue;
         for (const m of ent.lines[i].matchAll(f.re)) {
           if (f.kind === "value") {
             const g1 = m[1] === undefined ? "" : m[1];
@@ -308,7 +324,7 @@ function runCanary() {
   const { spawnSync } = require("child_process");
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hubcheck-"));
   let pass = 0;
-  const TOTAL = 14;
+  const TOTAL = 15;
   const check = (n, cond, why) => {
     if (cond) pass++;
     else console.log(`FAIL ${n}: ${why}`);
@@ -397,6 +413,22 @@ function runCanary() {
     // 14: --registry with no value
     r = run(["--registry"]);
     check(14, r.code === 2 && r.err.length > 0, `--registry with no value: expected exit 2 with stderr, got ${r.code}`);
+
+    // 15: historyMarker - a marked stale copy line is history, not drift;
+    // the same file without the key still drifts; "" is a registry error
+    const marker = "<!-- hub: history -->";
+    put("hub/owner.md", "# Hub\nTeam size: 7\n");
+    put("proj-b/notes.md", `# B\n\nteam size: 5 ${marker}\n`);
+    const markReg = { roots: [dir], skipDirs: ["node_modules"], skipPaths: ["Project Record"], facts: [teamFact(ownerPath)] };
+    writeReg({ ...markReg, historyMarker: marker });
+    r = runReg();
+    const markedOk = r.code === 0 && !r.out.includes("DRIFT ") && /; 1 good cop/.test(r.out);
+    writeReg(markReg);
+    const unmarked = runReg();
+    writeReg({ ...markReg, historyMarker: "" });
+    const emptyMark = runReg();
+    check(15, markedOk && unmarked.code === 1 && emptyMark.code === 2 && emptyMark.err.length > 0,
+      `historyMarker: marked exit ${r.code} (want 0, no DRIFT, 1 good copy), no-key exit ${unmarked.code} (want 1), empty exit ${emptyMark.code} (want 2): ${r.out.slice(0, 300)}`);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
