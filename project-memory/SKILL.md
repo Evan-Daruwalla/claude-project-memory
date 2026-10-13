@@ -437,6 +437,32 @@ Ported to `/docs-sync` on 2026-09-09. Note the section NUMBER changed (§6
 here became §4 there); `pm-cadence`'s SECTIONS map carries the new one, and
 its canary asserts it.
 
+## 7. CROSS-PROJECT HUBS (facts more than one project states)
+
+Inside a project, HANDOFF.md and the bins INDEX are hubs. Across projects
+there is none by default, so a fact several projects need (the owner's age,
+a machine-wide hook, a shared policy) gets copied, and the copies drift.
+
+- **One owner per fact.** A cross-project fact lives in a hub file outside
+  any one project: e.g. `<workspace>/.claude/workspace.md` for tooling and a
+  personal-context file for personal facts. The hub says it owns them.
+- **Spokes point, or are watched.** A private copy that is not always loaded
+  becomes a one-line pointer to the hub. A copy that must stand alone
+  (always-injected context; a public repo whose readers cannot open the
+  hub) stays a copy, and the registry watches it.
+- **Registry + checker.** `hub-registry.json` lists each fact: its owner, its
+  kind (`value`: capture group 1 of the pattern must equal `expect`;
+  `forbid`: the pattern is a stale claim that must not appear anywhere), the
+  roots to scan, and the dirs and paths to skip. Skip append-only records:
+  they are history, not copies. Template: templates.md, "Cross-project hub
+  registry"; worked example: `hub-registry.example.json`.
+- **Run:** `node hub-check.js --registry <file>` prints each fact's owner
+  status and copies, and every DRIFT as `path:line`. Exit 0 clean, 1 drift,
+  2 registry error.
+- **Changing a hub fact:** edit the owner first, run the checker, fix every
+  DRIFT it lists, run it again until it exits 0.
+- `node hub-check.js --canary` - MUST print `CANARY PASS 14/14`.
+
 ## Rules (all workflows)
 
 - Absolute dates everywhere ("2026-07-08", never "today"/"recently").

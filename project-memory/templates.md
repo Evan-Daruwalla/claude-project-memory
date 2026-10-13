@@ -330,3 +330,27 @@ its domain, index it) - never a `misc`/`other` catch-all (see SKILL section 5,
 Bin entries: one fact per line/short block - absolute dates - supersede in
 place ("(supersedes <date> entry: X)") - "(inferred, unverified)" where not
 verified.
+
+## Cross-project hub registry (SKILL section 7)
+
+`hub-registry.json`, kept beside the hub files (outside any one project):
+
+```json
+{
+  "roots": ["<workspace dir>", "~/.claude/CLAUDE.md"],
+  "skipDirs": ["node_modules", ".git", ".venv", "archive"],
+  "skipPaths": ["Project Record", "/docs/audits/"],
+  "extensions": [".md"],
+  "facts": [
+    { "id": "<kebab-id>", "owner": "<hub file>", "kind": "value",
+      "pattern": "<regex; group 1 captures the value>", "expect": "<value>" },
+    { "id": "<kebab-id>", "owner": "<hub file>", "kind": "forbid",
+      "pattern": "<regex for a claim that is no longer true>" }
+  ]
+}
+```
+
+One fact per entry. `skipPaths` holds append-only records and dated audits:
+they are history and may legitimately state an old value. Check:
+`node hub-check.js --registry <file>` - exit 0 clean, 1 drift, 2 registry
+error.

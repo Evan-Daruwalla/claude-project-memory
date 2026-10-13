@@ -1,0 +1,24 @@
+{
+  "roots": [
+    "~/projects",
+    "~/.claude/CLAUDE.md"
+  ],
+  "skipDirs": ["node_modules", ".git", ".venv", "dist", "archive"],
+  "skipPaths": ["Project Record", "/docs/record_", "/docs/adr/", "/docs/audits/"],
+  "extensions": [".md"],
+  "facts": [
+    {
+      "id": "team-size",
+      "owner": "~/projects/.hub/people.md",
+      "kind": "value",
+      "pattern": "\\bteam size:\\s*(\\d+)\\b",
+      "expect": "4"
+    },
+    {
+      "id": "deploy-gate-removed",
+      "owner": "~/projects/.hub/tooling.md",
+      "kind": "forbid",
+      "pattern": "(?<!\\bno )(?:hook|bot)[^.\\n]{0,60}\\bblocks?\\b[^.\\n]{0,40}\\bdeploy"
+    }
+  ]
+}
